@@ -1,6 +1,6 @@
 ; ============================================================================
 ; RAHKET Build Script
-; Zips the Modules folder, then compiles RAHKET_Main.ahk into RAHKET.exe
+; Zips the Modules folder, then compiles RAHKET_Main.ahk into RAHKET installer.exe
 ; Run this from the repo root, or from the build\ subfolder.
 ; ============================================================================
 
@@ -8,20 +8,32 @@
 #SingleInstance Force
 
 ; ── Resolve repo root (works whether script lives in build\ or repo root) ──
-scriptDir  := A_ScriptDir
-repoRoot   := (FileExist(scriptDir "\..\RAHKET_Main.ahk")) ? scriptDir "\.." : scriptDir
-repoRoot   := RTrim(repoRoot, "\")
+scriptDir := A_ScriptDir
+repoRoot  := (FileExist(scriptDir "\..\RAHKET_Main.ahk")) ? scriptDir "\.." : scriptDir
+repoRoot  := RTrim(repoRoot, "\")
 
-mainScript := repoRoot "\RAHKET_Main.ahk"
-modulesDir := repoRoot "\modules"
-zipDest    := repoRoot "\modules.zip"
-iconFile   := repoRoot "\assets\RAHKET_rocket_icon.ico"
-outputExe  := repoRoot "\build\RAHKET.exe"
-buildDir   := repoRoot "\build"
+mainScript  := repoRoot "\RAHKET_Main.ahk"
+modulesDir  := repoRoot "\modules"
+zipDest     := repoRoot "\modules.zip"
+iconFile    := repoRoot "\assets\RAHKET_rocket_icon.ico"
+versionFile := repoRoot "\version"
+outputExe   := repoRoot "\build\RAHKET installer.exe"
+buildDir    := repoRoot "\build"
 
 ; ── Verify repo root looks right ──
 if !FileExist(mainScript) {
     MsgBox("Could not find RAHKET_Main.ahk.`nExpected it at:`n" mainScript, "Build Error", 16)
+    ExitApp()
+}
+
+; ── Read version from version file ──
+if !FileExist(versionFile) {
+    MsgBox("Could not find version file.`nExpected it at:`n" versionFile, "Build Error", 16)
+    ExitApp()
+}
+buildVersion := Trim(FileRead(versionFile))
+if (buildVersion = "") {
+    MsgBox("version file is empty.", "Build Error", 16)
     ExitApp()
 }
 
@@ -68,8 +80,8 @@ if !FileExist(zipDest) {
 
 ; ── Step 3: Compile ──
 compileCmd := '"' compilerPath '"'
-    . ' /in "'  mainScript '"'
-    . ' /out "' outputExe '"'
+    . ' /in "'   mainScript '"'
+    . ' /out "'  outputExe '"'
     . ' /icon "' iconFile '"'
 
 RunWait(compileCmd, , "Hide")
@@ -79,7 +91,23 @@ if !FileExist(outputExe) {
     ExitApp()
 }
 
+; ── Step 4: Write version file to build\ ──
+buildVersionFile := buildDir "\version"
+if FileExist(buildVersionFile)
+    FileDelete(buildVersionFile)
+FileAppend(buildVersion, buildVersionFile)
+
+; ── Step 5: Clean up modules.zip from repo root ──
+if FileExist(zipDest)
+    FileDelete(zipDest)
+
 ; ── Done ──
-MsgBox("Build complete.`n`nEXE: " outputExe "`nZIP: " zipDest, "Build Successful", 64)
+MsgBox(
+    "Build complete.`n`n"
+    "Version: " buildVersion "`n"
+    "EXE: " outputExe "`n"
+    "Version file: " buildVersionFile,
+    "Build Successful", 64
+)
 Run('explorer.exe "' buildDir '"')
 ExitApp()
