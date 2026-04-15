@@ -7,7 +7,7 @@
 #SingleInstance Force
 Persistent
 
-RAHKET_VERSION := "1.00.01"
+RAHKET_VERSION := "1.00.10"
 
 GITHUB_VERSION_URL  := "https://raw.githubusercontent.com/rjgoif/RAHKET/main/version"
 GITHUB_RELEASES_URL := "https://github.com/rjgoif/RAHKET/releases/latest"
@@ -36,6 +36,8 @@ ExtractZip(zipPath, destDir) {
 
     ; 16 = FOF_NOCONFIRMMKDIR (no "confirm new folder" dialogs)
     dest.CopyHere(src.Items, 16)
+    if FileExist(zipPath)
+        FileDelete(zipPath)
     return true
 }
 
@@ -67,7 +69,6 @@ ReadConfig(key) {
 }
 
 configPath := A_ScriptDir "\rahket_config.ini"
-MsgBox("Config path: " configPath "`nExists: " FileExist(configPath))
 
 ; ============================================================================
 ; INSTALLER / BOOTSTRAP
@@ -256,18 +257,15 @@ MenuItem_Exit(*) {
 ; ============================================================================
 
 MenuItem_CheckForUpdates(*) {
-	MsgBox(GetNetworkUpdatePath())
     CheckForUpdates()
 }
 
 CheckForUpdates() {
     global RAHKET_VERSION, GITHUB_VERSION_URL, GITHUB_RELEASES_URL
 
-    ; --- Try network update path first ---
     networkPath := GetNetworkUpdatePath()
 
     if (networkPath != "") {
-        ; Network path is reachable — check version file there
         networkVersion := ReadNetworkVersion(networkPath)
 
         if (networkVersion = "") {
@@ -276,11 +274,16 @@ CheckForUpdates() {
         }
 
         if (networkVersion = RAHKET_VERSION) {
-            MsgBox("RAHKET is up to date (v" RAHKET_VERSION ").", "No Update Available", 64)
+            result := MsgBox(
+                "RAHKET is up to date (v" RAHKET_VERSION ").`n`n"
+                "Force reinstall from network anyway?",
+                "No Update Available", 4 + 32
+            )
+            if (result = "Yes")
+                DoNetworkUpdate(networkPath)
             return
         }
 
-        ; Newer version available on network
         result := MsgBox(
             "A new version of RAHKET is available.`n`n"
             "Current version:  v" RAHKET_VERSION "`n"
@@ -288,37 +291,29 @@ CheckForUpdates() {
             "Install now?",
             "Update Available", 4 + 32
         )
-
         if (result = "Yes")
             DoNetworkUpdate(networkPath)
-
         return
     }
 
-    ; --- Fall back to GitHub check ---
+    ; --- No network path — fall back to GitHub ---
     tempVersionFile := A_Temp "\rahket_version_check.txt"
-
     try {
         Download(GITHUB_VERSION_URL, tempVersionFile)
     } catch {
         MsgBox("Could not reach the update server.`nCheck your internet connection and try again.", "Update Check Failed", 48)
         return
     }
-
     if !FileExist(tempVersionFile) {
         MsgBox("Update check failed — version file not downloaded.", "Update Check Failed", 48)
         return
     }
-
     githubVersion := Trim(FileRead(tempVersionFile))
     FileDelete(tempVersionFile)
-
     if (githubVersion = RAHKET_VERSION) {
         MsgBox("RAHKET is up to date (v" RAHKET_VERSION ").", "No Update Available", 64)
         return
     }
-
-    ; Newer version on GitHub
     result := MsgBox(
         "A new version of RAHKET is available.`n`n"
         "Current version:  v" RAHKET_VERSION "`n"
@@ -326,7 +321,6 @@ CheckForUpdates() {
         "Open the downloads page?",
         "Update Available", 4 + 32
     )
-
     if (result = "Yes")
         Run(GITHUB_RELEASES_URL)
 }
@@ -400,12 +394,18 @@ DoNetworkUpdate(networkPath) {
     if hasConfig
         batContent .= "copy /y " q tempConfig q " " q localConfig q "`r`n"
 
-    batContent .=
-        "start " q q " " q localExe q "`r`n"
-        . "del " q batFile q "`r`n"
+    localModulesDir := A_ScriptDir "\Modules"
+    localZipPath    := A_ScriptDir "\modules.zip"
 
-    FileDelete(batFile)
-    FileAppend(batContent, batFile)
+    batContent .=
+        "if exist " q localModulesDir q " rmdir /s /q " q localModulesDir q "`r`n"
+        . "if exist " q localZipPath q " del /f /q " q localZipPath q "`r`n"
+        . "start " q q " " q localExe q "`r`n"
+        . "del " q batFile q "`r`n"
+	
+	if FileExist(batFile)
+		FileDelete(batFile)
+	FileAppend(batContent, batFile)
 
     MsgBox(
         "RAHKET will now close and update to v" ReadNetworkVersion(networkPath) ".`n"
