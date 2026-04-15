@@ -1,4 +1,4 @@
-﻿; ============================================================================
+; ============================================================================
 ; RADIOLOGY AUTOHOTKEY ENHANCEMENT TOOLS
 ; Written by Reece J. Goiffon, MD, PhD
 ; ============================================================================
@@ -7,6 +7,10 @@
 #SingleInstance Force
 Persistent
 
+RAHKET_VERSION := "1.00.01"
+
+GITHUB_VERSION_URL  := "https://raw.githubusercontent.com/rjgoif/RAHKET/main/version"
+GITHUB_RELEASES_URL := "https://github.com/rjgoif/RAHKET/releases/latest"
 
 
 
@@ -38,125 +42,145 @@ ExtractZip(zipPath, destDir) {
 
 
 ; ============================================================================
-; INSTALLER / BOOTSTRAP: ensure Modules, tray icon, and Start Menu shortcut
+; CONFIG READER
+; Returns value for a given key from rahket_config.ini, or "" if not found
+; ============================================================================
+
+ReadConfig(key) {
+    configPath := A_ScriptDir "\rahket_config.ini"
+    if !FileExist(configPath)
+        return ""
+
+    loop read, configPath {
+        line := Trim(A_LoopReadLine)
+        if (line = "" || SubStr(line, 1, 1) = ";")
+            continue
+        colonPos := InStr(line, "=")
+        if !colonPos
+            continue
+        lineKey := Trim(SubStr(line, 1, colonPos - 1))
+        lineVal := Trim(SubStr(line, colonPos + 1))
+        if (lineKey = key)
+            return lineVal
+    }
+    return ""
+}
+
+configPath := A_ScriptDir "\rahket_config.ini"
+MsgBox("Config path: " configPath "`nExists: " FileExist(configPath))
+
+; ============================================================================
+; INSTALLER / BOOTSTRAP
 ; ============================================================================
 
 if A_IsCompiled {
 
-    ; ============================================================
-    ;  NETWORK-LAUNCHED PROTECTION / SELF-COPY INSTALLER
-    ; ============================================================
-
     exePath := A_ScriptFullPath
     exeDir  := A_ScriptDir
 
-    ; Detect if app is launched from \\mghpacs\jpg or Z: drive
+    ; Generic network launch detection — no hardcoded paths in source
     isNetworkLaunch :=
-        InStr(exeDir, "\\mghpacs\jpg", false)      ; UNC network
-        || SubStr(exeDir, 1, 2) = "Z:"             ; Z: drive
+        (SubStr(exeDir, 1, 2) = "\\")     ; any UNC path
+        || (SubStr(exeDir, 1, 2) = "Z:")  ; Z: drive mapped network share
 
     if (isNetworkLaunch) {
 
-        ; --------------------------------------------------------
-        ; Build the EXACT target install directory:
-        ;   C:\Users\<user>\utils\RAHKET\
-        ; --------------------------------------------------------
-
-        userRoot := SubStr(A_AppData, 1, InStr(A_AppData, "\AppData") - 1)
-        ; Example:
-        ; A_AppData = C:\Users\JohnDoe\AppData\Roaming
-        ; userRoot = C:\Users\JohnDoe
-
+        ; Build local install directory: C:\Users\<user>\utils\RAHKET\
+        userRoot        := SubStr(A_AppData, 1, InStr(A_AppData, "\AppData") - 1)
         localInstallDir := userRoot "\utils\RAHKET"
 
         if !DirExist(localInstallDir)
             DirCreate(localInstallDir)
 
-        ; --- CLEAN OUT OLD MODULES + ZIP IN TARGET DIR ---
+        ; Clean out old modules
         localModulesDir := localInstallDir "\Modules"
         localZipPath    := localInstallDir "\modules.zip"
 
         if DirExist(localModulesDir)
-            DirDelete(localModulesDir, true)   ; true = recursive delete
+            DirDelete(localModulesDir, true)
 
         if FileExist(localZipPath)
             FileDelete(localZipPath)
 
-        ; Destination EXE
+        ; Copy installer EXE as RAHKET.exe
         localExe := localInstallDir "\RAHKET.exe"
+        FileCopy(exePath, localExe, true)
 
-        ; Copy this EXE locally (overwrite to ensure latest)
-        FileCopy(exePath, localExe, true)      ; true = force overwrite
+        ; Copy rahket_config.ini if present alongside installer
+        localConfig  := localInstallDir "\rahket_config.ini"
+        sourceConfig := exeDir "\rahket_config.ini"
+        if FileExist(sourceConfig)
+            FileCopy(sourceConfig, localConfig, true)
 
-        ; Notify user
         MsgBox(
-            "RAHKET should be run from your local device.`n"
-          . "A new installation was sent to:`n"
-          . localInstallDir,
-            "Local Installation Recommended", 64
+            "RAHKET has been installed to:`n" localInstallDir
+            "`n`nRAHKET will now launch from your local installation.",
+            "RAHKET Installed", 64
         )
 
-        ; Launch local instance
         Run(localExe)
-
-        ; Kill network-launched instance
         ExitApp()
     }
 
 
-
-    ; --- Ensure modules.zip exists beside the EXE (embedded via FileInstall) ---
+    ; --- Ensure modules.zip exists (embedded via FileInstall) ---
     zipPath    := A_ScriptDir "\modules.zip"
     modulesDir := A_ScriptDir "\Modules"
 
-    if !FileExist(zipPath) {
-        ; Embed modules.zip into the EXE at compile time and extract on first run
-        FileInstall("modules.zip", zipPath, false)   ; false = don't overwrite existing
-    }
+    if !FileExist(zipPath)
+        FileInstall("modules.zip", zipPath, false)
 
-    ; --- If Modules folder is missing, extract modules.zip into the EXE folder ---
-    if !DirExist(modulesDir) && FileExist(zipPath) {
-        ExtractZip(zipPath, A_ScriptDir)  ; zip should contain top-level "Modules" folder
-    }
+    ; --- Extract Modules folder if missing ---
+    if !DirExist(modulesDir) && FileExist(zipPath)
+        ExtractZip(zipPath, A_ScriptDir)
 
-    ; --- Ensure tray icon .ico exists beside the EXE (also via FileInstall) ---
+    ; --- Ensure tray icon exists ---
     icoPath := A_ScriptDir "\RAHKET_rocket_icon.ico"
-    if !FileExist(icoPath) {
-        ; Embed the icon and extract it; true = overwrite to keep icon in sync with builds
+    if !FileExist(icoPath)
         FileInstall("assets\RAHKET_rocket_icon.ico", icoPath, true)
-    }
 
-    ; --- (Re)create a Start Menu shortcut to this EXE ---
+    ; --- Create Start Menu shortcut ---
     try {
-        shortcutDir  := A_Programs                 ; Start Menu\Programs
+        shortcutDir  := A_Programs
         shortcutPath := shortcutDir "\RAHKET.lnk"
 
         if !DirExist(shortcutDir)
             DirCreate(shortcutDir)
 
-        exePath := A_ScriptFullPath
-
         if FileExist(shortcutPath)
             FileDelete(shortcutPath)
 
         FileCreateShortcut(
-            exePath,        ; Target
-            shortcutPath,   ; Shortcut file path
-            A_ScriptDir,    ; Working directory
-            ,               ; Args (none)
-            "RAHKET",       ; Description
-            exePath,        ; Icon = EXE's icon
-            ,               ; ShortcutKey (none)
-            1,              ; IconNumber
-            1               ; Run normal
+            A_ScriptFullPath,
+            shortcutPath,
+            A_ScriptDir,
+            ,
+            "RAHKET",
+            A_ScriptFullPath,
+            ,
+            1,
+            1
         )
     }
 }
 
-; --- Set tray icon to the .ico in the same folder (now guaranteed to exist when compiled) ---
-TraySetIcon(A_ScriptDir "\RAHKET_rocket_icon.ico")
 
-; --- Include modules ---
+
+; ============================================================================
+; TRAY ICON
+; ============================================================================
+
+if FileExist(A_ScriptDir "\RAHKET_rocket_icon.ico")
+    TraySetIcon(A_ScriptDir "\RAHKET_rocket_icon.ico")
+else if FileExist(A_ScriptDir "\assets\RAHKET_rocket_icon.ico")
+    TraySetIcon(A_ScriptDir "\assets\RAHKET_rocket_icon.ico")
+
+
+
+; ============================================================================
+; INCLUDE MODULES
+; ============================================================================
+
 #Include Modules\NoduleHunter.ahk
 #Include Modules\ThyroidNodules.ahk
 ;#Include Modules\ThyroidReformatter.ahk
@@ -166,26 +190,27 @@ TraySetIcon(A_ScriptDir "\RAHKET_rocket_icon.ico")
 #Include Modules\ImageInserter.ahk
 #Include Modules\PS_TextFormatter.ahk
 
-; Create system tray icon with custom menu
+
+
+; ============================================================================
+; TRAY MENU
+; ============================================================================
+
 A_TrayMenu.Delete()
-A_TrayMenu.Add("Lung Nodule Hunter", MenuItem_NoduleHunter)
-A_TrayMenu.Add("Thyroid Nodules", MenuItem_ThyroidNodules)
+A_TrayMenu.Add("Lung Nodule Hunter",   MenuItem_NoduleHunter)
+A_TrayMenu.Add("Thyroid Nodules",      MenuItem_ThyroidNodules)
 ;A_TrayMenu.Add("Thyroid Reformatter", MenuItem_ThyroidReformatter)
-A_TrayMenu.Add("Vessel Measurements", MenuItem_VesselMeasurements)
-A_TrayMenu.Add("Key Phone Numbers", MenuItem_KeyPhoneNumbers)
-
-; Add Links submenu from module
-A_TrayMenu.Add("Links", CreateLinksMenu())
-
-; Add Image Inserter submenu
-A_TrayMenu.Add("Image Inserter", CreateImageInserterMenu())
-
-; Add Report Edits submenu
-A_TrayMenu.Add("Report Edits", CreateReportEditsMenu())
-
+A_TrayMenu.Add("Vessel Measurements",  MenuItem_VesselMeasurements)
+A_TrayMenu.Add("Key Phone Numbers",    MenuItem_KeyPhoneNumbers)
+A_TrayMenu.Add("Links",                CreateLinksMenu())
+A_TrayMenu.Add("Image Inserter",       CreateImageInserterMenu())
+A_TrayMenu.Add("Report Edits",         CreateReportEditsMenu())
 A_TrayMenu.Add()
-A_TrayMenu.Add("About", MenuItem_About)
-A_TrayMenu.Add("Exit", MenuItem_Exit)
+A_TrayMenu.Add("Check for Updates",    MenuItem_CheckForUpdates)
+A_TrayMenu.Add("About",                MenuItem_About)
+A_TrayMenu.Add("Exit",                 MenuItem_Exit)
+
+
 
 ; ============================================================================
 ; MENU ITEM HANDLERS
@@ -209,24 +234,199 @@ MenuItem_VesselMeasurements(*) {
 
 MenuItem_KeyPhoneNumbers(*) {
     ShowPhoneNumbers()
-}						  
+}
 
 MenuItem_About(*) {
-    MsgBox("RAHKET`nRadiology AutoHotKey Enhancement Tools`nWritten by Reece J. Goiffon, MD, PhD", "About", 64)
+    MsgBox(
+        "RAHKET v" RAHKET_VERSION "`n"
+        "Radiology AutoHotKey Enhancement Tools`n"
+        "Written by Reece J. Goiffon, MD, PhD",
+        "About", 64
+    )
 }
 
 MenuItem_Exit(*) {
     ExitApp()
 }
 
+
+
 ; ============================================================================
-; IMAGE INSERTER SUBMENU CREATION
+; UPDATE CHECKER
+; ============================================================================
+
+MenuItem_CheckForUpdates(*) {
+	MsgBox(GetNetworkUpdatePath())
+    CheckForUpdates()
+}
+
+CheckForUpdates() {
+    global RAHKET_VERSION, GITHUB_VERSION_URL, GITHUB_RELEASES_URL
+
+    ; --- Try network update path first ---
+    networkPath := GetNetworkUpdatePath()
+
+    if (networkPath != "") {
+        ; Network path is reachable — check version file there
+        networkVersion := ReadNetworkVersion(networkPath)
+
+        if (networkVersion = "") {
+            MsgBox("Could not read version information from the network location.", "Update Check Failed", 48)
+            return
+        }
+
+        if (networkVersion = RAHKET_VERSION) {
+            MsgBox("RAHKET is up to date (v" RAHKET_VERSION ").", "No Update Available", 64)
+            return
+        }
+
+        ; Newer version available on network
+        result := MsgBox(
+            "A new version of RAHKET is available.`n`n"
+            "Current version:  v" RAHKET_VERSION "`n"
+            "Available version: v" networkVersion "`n`n"
+            "Install now?",
+            "Update Available", 4 + 32
+        )
+
+        if (result = "Yes")
+            DoNetworkUpdate(networkPath)
+
+        return
+    }
+
+    ; --- Fall back to GitHub check ---
+    tempVersionFile := A_Temp "\rahket_version_check.txt"
+
+    try {
+        Download(GITHUB_VERSION_URL, tempVersionFile)
+    } catch {
+        MsgBox("Could not reach the update server.`nCheck your internet connection and try again.", "Update Check Failed", 48)
+        return
+    }
+
+    if !FileExist(tempVersionFile) {
+        MsgBox("Update check failed — version file not downloaded.", "Update Check Failed", 48)
+        return
+    }
+
+    githubVersion := Trim(FileRead(tempVersionFile))
+    FileDelete(tempVersionFile)
+
+    if (githubVersion = RAHKET_VERSION) {
+        MsgBox("RAHKET is up to date (v" RAHKET_VERSION ").", "No Update Available", 64)
+        return
+    }
+
+    ; Newer version on GitHub
+    result := MsgBox(
+        "A new version of RAHKET is available.`n`n"
+        "Current version:  v" RAHKET_VERSION "`n"
+        "Available version: v" githubVersion "`n`n"
+        "Open the downloads page?",
+        "Update Available", 4 + 32
+    )
+
+    if (result = "Yes")
+        Run(GITHUB_RELEASES_URL)
+}
+
+
+GetNetworkUpdatePath() {
+    ; Read both paths from config
+    zPath   := ReadConfig("main_update")
+    uncPath := ReadConfig("alt_update")
+
+    ; Try Z: path first
+    if (zPath != "" && DirExist(zPath))
+        return zPath
+
+    ; Fall back to UNC path
+    if (uncPath != "" && DirExist(uncPath))
+        return uncPath
+
+    return ""
+}
+
+
+ReadNetworkVersion(networkPath) {
+    versionFile := networkPath "\version"
+    if !FileExist(versionFile)
+        return ""
+    return Trim(FileRead(versionFile))
+}
+
+
+DoNetworkUpdate(networkPath) {
+    newExe   := networkPath "\RAHKET Installer.exe"
+    localExe := A_ScriptFullPath
+    tempExe  := A_Temp "\RAHKET_update.exe"
+    batFile  := A_Temp "\rahket_updater.bat"
+
+    if !FileExist(newExe) {
+        MsgBox("Update file not found at the network location.", "Update Failed", 48)
+        return
+    }
+
+    ; Copy new EXE to temp location
+    try {
+        FileCopy(newExe, tempExe, true)
+    } catch {
+        MsgBox("Failed to copy update file. Check that you have access to the network location.", "Update Failed", 48)
+        return
+    }
+
+    ; Also copy updated config if present
+    newConfig   := networkPath "\rahket_config.ini"
+    localConfig := A_ScriptDir "\rahket_config.ini"
+    tempConfig  := A_Temp "\rahket_config_update.ini"
+    hasConfig   := FileExist(newConfig)
+    if hasConfig
+        FileCopy(newConfig, tempConfig, true)
+
+    ; Write batch file to wait for RAHKET to exit, replace EXE, restart
+	q := Chr(34)
+    batContent :=
+        "@echo off`r`n"
+        . "timeout /t 2 /nobreak >nul`r`n"
+        . ":waitloop`r`n"
+        . "tasklist | find /i " q "RAHKET.exe" q " >nul 2>&1`r`n"
+        . "if not errorlevel 1 (`r`n"
+        . "    timeout /t 1 /nobreak >nul`r`n"
+        . "    goto waitloop`r`n"
+        . ")`r`n"
+        . "copy /y " q tempExe q " " q localExe q "`r`n"
+
+    if hasConfig
+        batContent .= "copy /y " q tempConfig q " " q localConfig q "`r`n"
+
+    batContent .=
+        "start " q q " " q localExe q "`r`n"
+        . "del " q batFile q "`r`n"
+
+    FileDelete(batFile)
+    FileAppend(batContent, batFile)
+
+    MsgBox(
+        "RAHKET will now close and update to v" ReadNetworkVersion(networkPath) ".`n"
+        "It will restart automatically when complete.",
+        "Updating RAHKET", 64
+    )
+
+    Run(batFile, , "Hide")
+    ExitApp()
+}
+
+
+
+; ============================================================================
+; IMAGE INSERTER SUBMENU
 ; ============================================================================
 
 CreateImageInserterMenu() {
     imageInserterMenu := Menu()
     imageInserterMenu.Add("(Re)enable", MenuItem_ImageInserterEnable)
-    imageInserterMenu.Add("Disable", MenuItem_ImageInserterDisable)
+    imageInserterMenu.Add("Disable",    MenuItem_ImageInserterDisable)
     return imageInserterMenu
 }
 
@@ -238,13 +438,15 @@ MenuItem_ImageInserterDisable(*) {
     ImageInserter_Disable()
 }
 
+
+
 ; ============================================================================
-; REPORT EDITS SUBMENU CREATION
+; REPORT EDITS SUBMENU
 ; ============================================================================
 
 CreateReportEditsMenu() {
     reportEditsMenu := Menu()
-    reportEditsMenu.Add("Enable Report Editor", MenuItem_LineJoinerEnable)
+    reportEditsMenu.Add("Enable Report Editor",  MenuItem_LineJoinerEnable)
     reportEditsMenu.Add("Disable Report Editor", MenuItem_LineJoinerDisable)
     return reportEditsMenu
 }

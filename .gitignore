@@ -2,3 +2,4 @@ build/RAHKET.exe
 modules.zip
 *.bak
 Thumbs.db
+rahket_config.ini
