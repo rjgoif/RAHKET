@@ -7,7 +7,11 @@
 #SingleInstance Force
 Persistent
 
-RAHKET_VERSION := "1.00.10"
+RAHKET_VERSION := "1.0.1.0"
+; @Ahk2Exe-SetVersion 1.0.1.0
+; @Ahk2Exe-SetDescription RAHKET - Radiology AutoHotKey Enhancement Tools
+; @Ahk2Exe-SetProductName RAHKET
+; @Ahk2Exe-SetCompanyName Reece J. Goiffon MD PhD
 
 GITHUB_VERSION_URL  := "https://raw.githubusercontent.com/rjgoif/RAHKET/main/version"
 GITHUB_RELEASES_URL := "https://github.com/rjgoif/RAHKET/releases/latest"

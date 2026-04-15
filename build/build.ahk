@@ -37,6 +37,18 @@ if (buildVersion = "") {
     ExitApp()
 }
 
+; ── Update version strings in RAHKET_Main.ahk ──
+mainContent := FileRead(mainScript)
+
+; Replace RAHKET_VERSION := "x.x.x.x"
+mainContent := RegExReplace(mainContent, 'RAHKET_VERSION := "[^"]*"', 'RAHKET_VERSION := "' buildVersion '"')
+
+; Replace ; @Ahk2Exe-SetVersion x.x.x.x
+mainContent := RegExReplace(mainContent, '; @Ahk2Exe-SetVersion [^\r\n]*', '; @Ahk2Exe-SetVersion ' buildVersion)
+
+FileDelete(mainScript)
+FileAppend(mainContent, mainScript)
+
 ; ── Locate Ahk2Exe ──
 defaultCompiler := EnvGet("LOCALAPPDATA") "\Programs\AutoHotkey\Compiler\Ahk2Exe.exe"
 compilerPath    := ""
