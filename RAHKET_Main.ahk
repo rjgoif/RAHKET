@@ -378,9 +378,13 @@ DoNetworkUpdate(networkPath) {
     newConfig   := networkPath "\rahket_config.ini"
     localConfig := A_ScriptDir "\rahket_config.ini"
     tempConfig  := A_Temp "\rahket_config_update.ini"
-    hasConfig   := FileExist(newConfig)
-    if hasConfig
-        FileCopy(newConfig, tempConfig, true)
+    hasConfig := false
+    if FileExist(newConfig) {
+        try {
+            FileCopy(newConfig, tempConfig, true)
+            hasConfig := true
+        }
+    }
 
     ; Write batch file to wait for RAHKET to exit, replace EXE, restart
 	q := Chr(34)
