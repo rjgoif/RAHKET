@@ -675,24 +675,30 @@ OnColorRejected(guiObj, filteredPath) {
 ImageInserter_HotkeyRouter(*) {
     global ImageInserter_IsActive
 
-    ; If the module is disabled via menu, do nothing
     if !ImageInserter_IsActive {
         ShowFlashMessage("Image Inserter is disabled in the menu.", 400, 300)
         return
     }
 
-    ; If PowerScribe is active, reformat pairs
     if WinActive("ahk_exe Nuance.PowerScribeOne.exe") {
         ReformatSeriesImage()
         return
     }
 
-    ; Route to correct capture method based on Visage version
-    if IsNewVisageUI() {
-        CaptureSeriesImage_NewUI()
-    } else {
-        CaptureSeriesImage()
+    activeExe := WinGetProcessName("A")
+    if InStr(activeExe, "vsclient.exe") {
+        if IsNewVisageUI() {
+            CaptureSeriesImage_NewUI()
+        } else {
+            CaptureSeriesImage()
+        }
+        return
     }
+
+	; Neither Visage nor PowerScribe — pass through normally
+	Hotkey("``", "Off")
+	SendEvent("``")
+	Hotkey("``", "On")
 }
 
 
