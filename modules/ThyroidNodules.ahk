@@ -326,20 +326,20 @@ Show_ThyroidNodules() {
 
 
 
-    ; ================================================================
-    ; TAB CONTROL (currently 3 tabs as before)
-    ; ================================================================
+	; ================================================================
+	; TAB CONTROL (15 tabs: 5 Right, 5 Left, 5 Isthmus)
+	; ================================================================
     global TN_Tab := TN.Add("Tab3"
         , "x20 y" tabsY " w1160 h780 vTN_TabControl"
         , ["Right #1", "Right #2", "Right #3", "Right #4", "Right #5"
            , "Left #1",  "Left #2",  "Left #3",  "Left #4",  "Left #5"
            , "Isthmus #1", "Isthmus #2", "Isthmus #3", "Isthmus #4", "Isthmus #5"])
+	TN_Tab.OnEvent("Change", TN_OnTabChange)
 
 
 
 
-
-    ; Build each tabâ€™s content
+    ; Build each tab content
     Loop 15 {
         TN_Tab.UseTab(A_Index)
         BuildNoduleTab(TN, A_Index)
@@ -404,6 +404,7 @@ Show_ThyroidNodules() {
 
     TN.Show("w1220 h" windowHeight)
 	SetTimer(() => TN_UpdateFieldColors(), -10)
+	TN_OnTabChange(TN_Tab)
 
 
 
@@ -414,6 +415,7 @@ Show_ThyroidNodules() {
         windowHeight := 1050
 
     TN.Show("w1220 h" windowHeight)
+	TN_OnTabChange(TN_Tab)
 	SetTimer(() => TN_UpdateFieldColors(), -10)
 
     ; --- Set up splitter drag using GUI events ---
@@ -838,7 +840,7 @@ BuildNoduleTab(TN, noduleNum) {
         TN.Add("Button"
             , "x" sideX " y" (startY+55) " w" sideW " h25 vTN" noduleNum "_Btn_Mid"
             , "Mid")
-            .OnEvent("Click", TN_ButtonClick.Bind(noduleNum, "Location", "midgland"))
+            .OnEvent("Click", TN_ButtonClick.Bind(noduleNum, "Location", "Midgland"))
 
         TN.Add("Button"
             , "x" sideX " y" (startY+85) " w" sideW " h25 vTN" noduleNum "_Btn_Lower"
@@ -1966,10 +1968,13 @@ TN_SetButtonHighlight(ctrlName, isOn) {
     try ctrl := TN_GuiObj[ctrlName]
     catch
         return
-    if (isOn)
-        ctrl.SetFont("Bold cBlue")
-    else
-        ctrl.SetFont("Norm cDefault")
+    if (isOn) {
+        ctrl.SetFont("s10 Bold cWhite")
+        ctrl.Opt("+Background0055CC")
+    } else {
+        ctrl.SetFont("s9 Norm cDefault")
+        ctrl.Opt("+BackgroundDefault")
+    }
 }
 
 TN_SetImageHighlight(ctrlName, isOn, isMulti := false) {
@@ -2012,7 +2017,7 @@ TN_UpdateHighlights() {
             "Right lobe", "_Btn_RightLobe",
             "Left lobe",  "_Btn_LeftLobe",
             "Upper pole", "_Btn_Upper",
-            "Mid",        "_Btn_Mid",
+            "Midgland",        "_Btn_Mid",
             "Lower pole", "_Btn_Lower"
         ) {
             TN_SetButtonHighlight("TN" n suffix, loc = val)
@@ -2142,6 +2147,17 @@ TN_UpdateHighlights() {
 	TN_UpdateFieldColors()
 }
 
+
+TN_SetSectionHeader(ctrl, hasSelection) {
+    if (hasSelection) {
+        ctrl.Opt("Background00AA44")
+        ctrl.SetFont("s11 Bold cWhite")
+    } else {
+        ctrl.Opt("BackgroundEB8D52")
+        ctrl.SetFont("s11 Bold cDefault")
+    }
+}
+
 TN_UpdateFieldColors() {
     global TN_Selections, TN_GuiObj
     if !TN_GuiObj
@@ -2199,10 +2215,10 @@ TN_UpdateFieldColors() {
         hasFoci := noneOn || (IsObject(selections["EchogenicFoci"]) && selections["EchogenicFoci"].Length > 0)
         
         ; Update header backgrounds (these are Text controls with names like "TN1_Hdr_Composition")
-        try TN_GuiObj["TN" n "_Hdr_Composition"].Opt(compHasSelection ? "BackgroundLime" : orangeBg)
-        try TN_GuiObj["TN" n "_Hdr_Echogenicity"].Opt(echoHasSelection ? "BackgroundLime" : orangeBg)
-        try TN_GuiObj["TN" n "_Hdr_EchogenicFoci"].Opt(hasFoci ? "BackgroundLime" : orangeBg)
-        try TN_GuiObj["TN" n "_Hdr_Margin"].Opt(marginHasSelection ? "BackgroundLime" : orangeBg)
+		try TN_SetSectionHeader(TN_GuiObj["TN" n "_Hdr_Composition"],   compHasSelection)
+		try TN_SetSectionHeader(TN_GuiObj["TN" n "_Hdr_Echogenicity"],  echoHasSelection)
+		try TN_SetSectionHeader(TN_GuiObj["TN" n "_Hdr_EchogenicFoci"], hasFoci)
+		try TN_SetSectionHeader(TN_GuiObj["TN" n "_Hdr_Margin"],        marginHasSelection)
     }
     
     ; Top lobe length fields
@@ -2487,3 +2503,13 @@ TN_PlainToRtfInline(plain) {
 }
 
 
+TN_OnTabChange(ctrl, *) {
+    global TN_GuiObj
+    tabIdx := ctrl.Value
+    labels := ["Right #1","Right #2","Right #3","Right #4","Right #5"
+              ,"Left #1","Left #2","Left #3","Left #4","Left #5"
+              ,"Isthmus #1","Isthmus #2","Isthmus #3","Isthmus #4","Isthmus #5"]
+    if (tabIdx >= 1 && tabIdx <= labels.Length)
+        TN_GuiObj.Title := "Thyroid Nodules  |  Active: " labels[tabIdx]
+    TN_UpdateFieldColors()
+}
