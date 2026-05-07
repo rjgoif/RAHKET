@@ -83,7 +83,7 @@ if FileExist(zipDest)
 ; ── Step 2: Zip the modules folder using PowerShell ──
 psCmd := 'powershell.exe -NoProfile -Command "Compress-Archive -Path \"' . modulesDir . '\" -DestinationPath \"' . zipDest . '\" -Force"'
 
-RunWait(psCmd, , "Hide")
+RunWait(psCmd, , )
 
 if !FileExist(zipDest) {
     MsgBox("Failed to create modules.zip.`nCheck that the modules\ folder exists at:`n" modulesDir, "Build Error", 16)
@@ -96,7 +96,7 @@ compileCmd := '"' compilerPath '"'
     . ' /out "'  outputExe '"'
     . ' /icon "' iconFile '"'
 
-RunWait(compileCmd, , "Hide")
+RunWait(compileCmd, , )
 
 if !FileExist(outputExe) {
     MsgBox("Compilation failed.`nAhk2Exe did not produce an output file.`nCheck that RAHKET_Main.ahk has no syntax errors.", "Build Error", 16)
