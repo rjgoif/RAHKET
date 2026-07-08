@@ -9,6 +9,7 @@
 
 ; Global variable to track if Report Editor is enabled
 global LineJoinerEnabled := false
+global LineJoiner_PromptDeclined := false  ; if true, don't ask again this session
 
 ; Only set these if running standalone
 if (A_LineFile = A_ScriptFullPath) {
@@ -195,14 +196,39 @@ if (A_LineFile = A_ScriptFullPath) {
 #HotIf
 
 
+; When PowerScribe is active but Report Editor is disabled, ask once per
+; session whether to turn it on. Yes (default/Enter) enables and re-fires
+; the same shortcut. No suppresses further prompts until re-enabled.
+#HotIf WinActive("ahk_exe Nuance.PowerScribeOne.exe") and !LineJoinerEnabled
+^j up::
+{
+    if LineJoiner_PromptAndEnable()
+        Send("^j")
+}
+
+^+j up::
+{
+    if LineJoiner_PromptAndEnable()
+        Send("^+j")
+}
+
+^+d up::
+{
+    if LineJoiner_PromptAndEnable()
+        Send("^+d")
+}
+#HotIf
+
+
 ; ============================================================================
 ; HELPER FUNCTIONS
 ; ============================================================================
 
 ; Enable Report Editor hotkeys
 LineJoiner_Enable() {
-    global LineJoinerEnabled
+    global LineJoinerEnabled, LineJoiner_PromptDeclined
     LineJoinerEnabled := true
+    LineJoiner_PromptDeclined := false
     MsgBox(
         "Report Editor Enabled`n`n"
         . "Highlight text in PowerScribe:`n`n"
@@ -216,6 +242,27 @@ LineJoiner_Enable() {
 LineJoiner_Disable() {
     global LineJoinerEnabled
     LineJoinerEnabled := false
+}
+
+; Prompt (once per session) to enable Report Editor. Returns true if
+; enabled (either already, or just now), false if declined/still disabled.
+LineJoiner_PromptAndEnable() {
+    global LineJoinerEnabled, LineJoiner_PromptDeclined
+
+    if (LineJoiner_PromptDeclined) {
+        return false
+    }
+
+    result := MsgBox("Report Editor is currently disabled.`n`nEnable it now?"
+                    , "Enable Report Editor", "YesNo 32")
+
+    if (result = "No") {
+        LineJoiner_PromptDeclined := true
+        return false
+    }
+
+    LineJoinerEnabled := true
+    return true
 }
 
 ; ---- Date formatting helpers ----

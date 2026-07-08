@@ -7,8 +7,8 @@
 #SingleInstance Force
 Persistent
 
-RAHKET_VERSION := "1.00.12"
-;@Ahk2Exe-SetVersion 1.00.12
+RAHKET_VERSION := "1.00.14"
+;@Ahk2Exe-SetVersion 1.00.14
 ;@Ahk2Exe-SetDescription RAHKET - Radiology AutoHotKey Enhancement Tools
 ;@Ahk2Exe-SetProductName RAHKET
 ;@Ahk2Exe-SetCompanyName Reece J. Goiffon MD PhD
@@ -435,6 +435,8 @@ CreateImageInserterMenu() {
     imageInserterMenu := Menu()
     imageInserterMenu.Add("(Re)enable", MenuItem_ImageInserterEnable)
     imageInserterMenu.Add("Disable",    MenuItem_ImageInserterDisable)
+    imageInserterMenu.Add()
+    imageInserterMenu.Add("Force DICOM Header Method", MenuItem_ImageInserterForceNewUI)
     return imageInserterMenu
 }
 
@@ -446,7 +448,11 @@ MenuItem_ImageInserterDisable(*) {
     ImageInserter_Disable()
 }
 
-
+MenuItem_ImageInserterForceNewUI(ItemName, ItemPos, MyMenu) {
+    global ForceNewVisageUI
+    ForceNewVisageUI := !ForceNewVisageUI
+    MyMenu.ToggleCheck(ItemName)
+}
 
 ; ============================================================================
 ; REPORT EDITS SUBMENU

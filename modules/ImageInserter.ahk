@@ -57,6 +57,7 @@ global MAX_OCR_MONITOR_FRACTION := 0.30  ; 30% of monitor pixel area
 ; --- Visage version ---
 global VISAGE_EXE_PATH := "C:\Program Files\Visage Imaging\Visage 7.1\bin\arch-Win\vsclient.exe"
 global g_VisageIsNewUI := ""  ; "" = not yet checked, true/false once resolved
+global ForceNewVisageUI := false  ; tray menu override: force DICOM header method
 
 
 
@@ -65,6 +66,7 @@ global g_VisageIsNewUI := ""  ; "" = not yet checked, true/false once resolved
 ; ============================================================================
 
 global ImageInserter_IsActive := false
+global ImageInserter_PromptDeclined := false  ; if true, don't ask again this session
 
 ; Register the backtick hotkey ONCE
 Hotkey("``", ImageInserter_HotkeyRouter)
@@ -96,7 +98,10 @@ GetVisageVersion() {
 IsNewVisageUI() {
     ; Returns true if Visage version is >= 7.1.19 (new DICOM dialog UI).
     ; Caches the result so the exe is only queried once per session.
-    global g_VisageIsNewUI
+    ; Can be overridden via the tray menu "Force DICOM Header Method" option.
+    global g_VisageIsNewUI, ForceNewVisageUI
+    if (ForceNewVisageUI)
+        return true
     if (g_VisageIsNewUI != "")
         return g_VisageIsNewUI
     v := GetVisageVersion()
@@ -141,7 +146,9 @@ ResetCropLearningState() {
 
 
 ImageInserter_Enable() {
-    global ImageInserter_IsActive
+    global ImageInserter_IsActive, ImageInserter_PromptDeclined
+
+    ImageInserter_PromptDeclined := false
 
     if (ImageInserter_IsActive) {
         ImageInserter_Disable()
@@ -673,11 +680,33 @@ OnColorRejected(guiObj, filteredPath) {
 
 
 ImageInserter_HotkeyRouter(*) {
-    global ImageInserter_IsActive
+    global ImageInserter_IsActive, ImageInserter_PromptDeclined
 
     if !ImageInserter_IsActive {
-        ShowFlashMessage("Image Inserter is disabled in the menu.", 400, 300)
-        return
+
+        activeExe := WinGetProcessName("A")
+        isVisageActive := InStr(activeExe, "vsclient.exe")
+
+        ; Only prompt when Visage is the active window
+        if !isVisageActive {
+            ShowFlashMessage("Image Inserter is disabled in the menu.", 400, 300)
+            return
+        }
+
+        ; Already declined this session - stay silent
+        if (ImageInserter_PromptDeclined) {
+            return
+        }
+
+        result := MsgBox("Image Inserter is currently disabled.`n`nEnable it now?"
+                        , "Enable Image Inserter", "YesNo 32")
+
+        if (result = "No") {
+            ImageInserter_PromptDeclined := true
+            return
+        }
+
+        ImageInserter_Enable()
     }
 
     if WinActive("ahk_exe Nuance.PowerScribeOne.exe") {
