@@ -56,22 +56,33 @@ LT_CopyBtnCtrl       := ""
 LT_PendingResizeW    := 0
 LT_PendingResizeH    := 0
 
-; Dynamic middle-column controls, tracked so a refresh can hide the old set
-; instead of destroying/recreating the window
+; The middle column is a genuine child window, reparented into LT_GuiObj
+; exactly ONCE (see LT_CreateMidPanel) and never destroyed/reparented again
+; -- an earlier attempt destroyed and re-reparented it on every click, which
+; is almost certainly what corrupted AHK's internal window bookkeeping and
+; crashed the process. Content within it is still just hidden/replaced the
+; same safe way the rest of this module already works, same as before.
+; Being a real child window with a real WS_VSCROLL scrollbar means Windows
+; handles clipping and repositioning natively -- no more hand-rolled
+; per-control Move/Visible math for ordinary scrolling.
+LT_MidPanel        := ""
+LT_MidPanelX       := 0
+LT_MidPanelY       := 0
+LT_MidPanelW       := 0
+LT_MidPanelH       := 0
+LT_MidPanelClientW := 0
+LT_MidPanelClientH := 0
+
+; Dynamic middle-column controls, tracked so a rebuild can hide the old set
+; instead of destroying anything
 LT_MiddleControls := []
 
 ; instId|fieldId -> array of {ctrl, meta}, used to update button text in
 ; place without a full middle-column rebuild
 LT_FieldControls := Map()
 
-; Logical (unscrolled) rect per middle-column control, captured at creation,
-; used to reposition/clip controls when the panel is scrolled
-LT_ControlRect     := Map()
 LT_ScrollOffset     := 0
-LT_LastAppliedScroll := -1
-LT_MidViewportTop   := 35
-LT_MidViewportBottom := 560
-LT_MidContentBottom := 35
+LT_MidContentBottom := 10
 
 ; One clickable Text control per report line on the right; clicking a line
 ; jumps to and expands the matching device in the middle column
@@ -82,6 +93,7 @@ LT_DeviceOrder := ["ETT", "TRACH", "ENTERIC", "FEEDING", "IJ", "SCV", "PICC", "P
     "IMPELLA", "LVAD", "EPIWIRE", "GENERATOR", "RETAINEDLEADS", "PADS", "PLEURAL", "MEDIASTINAL", "EPIDURAL"]
 
 OnMessage(0x20A, LT_OnMouseWheel)  ; WM_MOUSEWHEEL
+OnMessage(0x115, LT_OnVScroll)     ; WM_VSCROLL
 
 ; ============================================================================
 ; SHARED ANATOMIC LOCATION GROUPS
@@ -1020,18 +1032,18 @@ LT_ClearAll(*) {
 ; cleanest way to reclaim the hidden controls that pile up over a long
 ; session, since a fresh window has none.
 LT_NewPatient(*) {
-    global LT_GuiObj, LT_Instances, LT_InstanceOrder, LT_InstanceCounter
-    global LT_MiddleControls, LT_FieldControls, LT_ControlRect, LT_ScrollOffset
+    global LT_GuiObj, LT_MidPanel, LT_Instances, LT_InstanceOrder, LT_InstanceCounter
+    global LT_MiddleControls, LT_FieldControls, LT_ScrollOffset
 
     gx := 0, gy := 0, gw := 0, gh := 0
     if (IsObject(LT_GuiObj)) {
         try LT_GuiObj.GetPos(&gx, &gy, &gw, &gh)
-        try LT_GuiObj.Destroy()
+        try LT_GuiObj.Destroy()  ; also destroys LT_MidPanel, since it's a child of this window
     }
     LT_GuiObj := ""
+    LT_MidPanel := ""
     LT_MiddleControls := []
     LT_FieldControls := Map()
-    LT_ControlRect := Map()
     LT_ScrollOffset := 0
 
     LT_Instances := Map()
@@ -1289,114 +1301,180 @@ LT_FieldHidden(fieldDef, fields) {
     return curVal != cond["value"]
 }
 
-; Creates the middle-column child window: a plain top-level popup that gets
-; surgically converted to a WS_CHILD of the main window and given a native
-; WS_VSCROLL scrollbar. Being a real child window means Windows clips its
-; content and handles scrolling redraws itself -- no manual hide/show/move
-; bookkeeping, and no leftover-pixel artifacts.
-; Adds a control to the middle column and tracks it so a later refresh can
-; hide it instead of destroying the window, and so it can be repositioned
-; when the panel is scrolled.
+; Creates the middle-column child window ONCE: a plain top-level popup that
+; gets surgically converted to a WS_CHILD of the main window and given a
+; native WS_VSCROLL scrollbar. Never destroyed/reparented again after this
+; -- only its contents get hidden/replaced (see LT_RebuildMiddleColumn),
+; the same safe pattern the rest of this module already uses. Being a real
+; child window means Windows clips its content and repositions its children
+; on scroll natively; we don't hand-roll any of that.
+LT_CreateMidPanel() {
+    global LT_GuiObj, LT_MidPanelX, LT_MidPanelY, LT_MidPanelW, LT_MidPanelH
+    global LT_MidPanelClientW, LT_MidPanelClientH
+
+    panel := Gui("-Caption +ToolWindow -DPIScale", "")
+    panel.BackColor := "F0F0F0"
+    panel.Show("Hide x0 y0 w" LT_MidPanelW " h" LT_MidPanelH)
+
+    hwnd := panel.Hwnd
+    GWL_STYLE := -16
+    WS_POPUP := 0x80000000
+    WS_CAPTION := 0x00C00000
+    WS_CHILD := 0x40000000
+    WS_VSCROLL := 0x00200000
+    WS_CLIPSIBLINGS := 0x04000000
+
+    style := DllCall("GetWindowLong", "ptr", hwnd, "int", GWL_STYLE, "int")
+    style := (style & ~WS_POPUP & ~WS_CAPTION) | WS_CHILD | WS_VSCROLL | WS_CLIPSIBLINGS
+    DllCall("SetWindowLong", "ptr", hwnd, "int", GWL_STYLE, "int", style)
+    DllCall("SetParent", "ptr", hwnd, "ptr", LT_GuiObj.Hwnd)
+    DllCall("MoveWindow", "ptr", hwnd, "int", LT_MidPanelX, "int", LT_MidPanelY, "int", LT_MidPanelW, "int", LT_MidPanelH, "int", 1)
+    DllCall("ShowWindow", "ptr", hwnd, "int", 5)  ; SW_SHOW
+
+    rect := Buffer(16, 0)
+    DllCall("GetClientRect", "ptr", hwnd, "ptr", rect)
+    LT_MidPanelClientW := NumGet(rect, 8, "int")
+    LT_MidPanelClientH := NumGet(rect, 12, "int")
+
+    return panel
+}
+
+; Moves/resizes the panel (e.g. on a window resize) without touching its
+; WS_CHILD/reparented state, and re-queries its usable client size.
+LT_MoveMidPanel(x, y, w, h) {
+    global LT_MidPanel, LT_MidPanelX, LT_MidPanelY, LT_MidPanelW, LT_MidPanelH
+    global LT_MidPanelClientW, LT_MidPanelClientH
+
+    LT_MidPanelX := x
+    LT_MidPanelY := y
+    LT_MidPanelW := w
+    LT_MidPanelH := h
+
+    if (!IsObject(LT_MidPanel))
+        return
+
+    try DllCall("MoveWindow", "ptr", LT_MidPanel.Hwnd, "int", x, "int", y, "int", w, "int", h, "int", 1)
+
+    rect := Buffer(16, 0)
+    DllCall("GetClientRect", "ptr", LT_MidPanel.Hwnd, "ptr", rect)
+    LT_MidPanelClientW := NumGet(rect, 8, "int")
+    LT_MidPanelClientH := NumGet(rect, 12, "int")
+}
+
+; Adds a control into the middle-column panel and tracks it so a later
+; rebuild can hide it instead of destroying anything.
 LT_AddMid(g, ctrlType, opts, text) {
-    global LT_MiddleControls, LT_ControlRect
+    global LT_MiddleControls
     ctrl := g.Add(ctrlType, opts, text)
     LT_MiddleControls.Push(ctrl)
-    ctrl.GetPos(&cx, &cy, &cw, &ch)
-    ; "visible" tracks what we last set the control to, so LT_ApplyScroll
-    ; can skip Win32 calls entirely for controls that are already hidden
-    ; and remain hidden after a scroll -- that's most of them once more
-    ; than one device is on the list, and it's the single biggest cost of
-    ; a scroll pass.
-    LT_ControlRect[ctrl] := Map("x", cx, "y", cy, "w", cw, "h", ch, "visible", true)
     return ctrl
 }
 
-; Repositions/hides every middle-column control based on the current scroll
-; offset, simulating a clipped scrollable viewport without a child window.
-; Finishes with a plain repaint request (InvalidateRect/UpdateWindow -- safe,
-; standard calls that don't touch any window's structure) to clear up any
-; stray pixels left by the Move/Visible changes above.
-LT_ApplyScroll() {
-    global LT_MiddleControls, LT_ControlRect, LT_ScrollOffset, LT_MidViewportTop, LT_MidViewportBottom, LT_GuiObj, LT_LastAppliedScroll
-
-    if (LT_ScrollOffset = LT_LastAppliedScroll)
+; Pushes the scrollbar's range/page/position to match current content.
+LT_UpdateScrollInfo() {
+    global LT_MidPanel, LT_MidContentBottom, LT_MidPanelClientH, LT_ScrollOffset
+    if (!IsObject(LT_MidPanel))
         return
-    LT_LastAppliedScroll := LT_ScrollOffset
-
-    WM_SETREDRAW := 0x000B
-    if (IsObject(LT_GuiObj))
-        try DllCall("SendMessage", "ptr", LT_GuiObj.Hwnd, "uint", WM_SETREDRAW, "ptr", 0, "ptr", 0)
-
-    for ctrl in LT_MiddleControls {
-        r := LT_ControlRect.Get(ctrl, "")
-        if (r = "")
-            continue
-        newY := r["y"] - LT_ScrollOffset
-        willShow := !(newY + r["h"] < LT_MidViewportTop || newY > LT_MidViewportBottom)
-
-        if (!willShow) {
-            if (r["visible"]) {
-                try ctrl.Visible := false
-                r["visible"] := false
-            }
-            continue  ; already hidden and staying hidden -- nothing to do
-        }
-
-        if (!r["visible"]) {
-            try ctrl.Visible := true
-            r["visible"] := true
-        }
-        try ctrl.Move(r["x"], newY)
-    }
-
-    if (IsObject(LT_GuiObj)) {
-        try DllCall("SendMessage", "ptr", LT_GuiObj.Hwnd, "uint", WM_SETREDRAW, "ptr", 1, "ptr", 0)
-        try DllCall("InvalidateRect", "ptr", LT_GuiObj.Hwnd, "ptr", 0, "int", 1)
-    }
+    SB_VERT := 1
+    SIF_ALL := 0x17
+    si := Buffer(28, 0)
+    NumPut("uint", 28, si, 0)
+    NumPut("uint", SIF_ALL, si, 4)
+    NumPut("int", 0, si, 8)                                     ; nMin
+    NumPut("int", Max(LT_MidContentBottom, LT_MidPanelClientH), si, 12) ; nMax
+    NumPut("uint", LT_MidPanelClientH, si, 16)                   ; nPage
+    NumPut("int", LT_ScrollOffset, si, 20)                       ; nPos
+    DllCall("SetScrollInfo", "ptr", LT_MidPanel.Hwnd, "int", SB_VERT, "ptr", si, "int", 1)
 }
 
-LT_MaxScrollOffset() {
-    global LT_MidContentBottom, LT_MidViewportTop, LT_MidViewportBottom
-    viewportH := LT_MidViewportBottom - LT_MidViewportTop
-    return Max(0, LT_MidContentBottom - LT_MidViewportTop - viewportH)
+; Scrolls the panel to an absolute position. Because this panel's whole
+; client area IS the scrollable content (no restricted rect needed, unlike
+; the earlier attempt that had to share one window with two other columns),
+; this is the simple, fully-supported form of ScrollWindow: passing NULL
+; rects moves every child control automatically and is the faster path per
+; the Win32 docs.
+LT_ScrollTo(newPos) {
+    global LT_MidPanel, LT_ScrollOffset, LT_MidContentBottom, LT_MidPanelClientH
+    if (!IsObject(LT_MidPanel))
+        return
+    maxScroll := Max(0, LT_MidContentBottom - LT_MidPanelClientH)
+    if (newPos < 0)
+        newPos := 0
+    if (newPos > maxScroll)
+        newPos := maxScroll
+    if (newPos = LT_ScrollOffset)
+        return
+    dy := LT_ScrollOffset - newPos
+    try DllCall("ScrollWindow", "ptr", LT_MidPanel.Hwnd, "int", 0, "int", dy, "ptr", 0, "ptr", 0)
+    LT_ScrollOffset := newPos
+    LT_UpdateScrollInfo()
 }
 
+; Native scrollbar drag/click handling for the middle-column panel.
+LT_OnVScroll(wParam, lParam, msg, hwnd) {
+    global LT_MidPanel, LT_ScrollOffset
+
+    if (!IsObject(LT_MidPanel) || hwnd != LT_MidPanel.Hwnd)
+        return
+
+    SB_VERT := 1
+    SIF_ALL := 0x17
+    si := Buffer(28, 0)
+    NumPut("uint", 28, si, 0)
+    NumPut("uint", SIF_ALL, si, 4)
+    DllCall("GetScrollInfo", "ptr", hwnd, "int", SB_VERT, "ptr", si)
+    minP := NumGet(si, 8, "int")
+    maxP := NumGet(si, 12, "int")
+    pageSz := NumGet(si, 16, "uint")
+    trackPos := NumGet(si, 24, "int")
+
+    action := wParam & 0xFFFF
+    newPos := LT_ScrollOffset
+    if (action = 0)        ; SB_LINEUP
+        newPos -= 30
+    else if (action = 1)   ; SB_LINEDOWN
+        newPos += 30
+    else if (action = 2)   ; SB_PAGEUP
+        newPos -= pageSz
+    else if (action = 3)   ; SB_PAGEDOWN
+        newPos += pageSz
+    else if (action = 4 || action = 5)  ; SB_THUMBTRACK / SB_THUMBPOSITION
+        newPos := trackPos
+    else if (action = 6)   ; SB_TOP
+        newPos := minP
+    else if (action = 7)   ; SB_BOTTOM
+        newPos := maxP
+    else
+        return
+
+    LT_ScrollTo(newPos)
+}
+
+; Mouse wheel scrolling: hit-test in screen coordinates against the panel's
+; actual window rect.
 LT_OnMouseWheel(wParam, lParam, msg, hwnd) {
-    global LT_GuiObj, LT_MidX, LT_MidW, LT_MidViewportTop, LT_MidViewportBottom, LT_ScrollOffset
+    global LT_MidPanel, LT_ScrollOffset
 
-    if (!IsObject(LT_GuiObj) || hwnd != LT_GuiObj.Hwnd)
+    if (!IsObject(LT_MidPanel))
         return
 
     sx := lParam & 0xFFFF
     sy := (lParam >> 16) & 0xFFFF
 
-    pt := Buffer(8, 0)
-    NumPut("int", sx, pt, 0)
-    NumPut("int", sy, pt, 4)
-    DllCall("ScreenToClient", "ptr", hwnd, "ptr", pt)
-    cx := NumGet(pt, 0, "int")
-    cy := NumGet(pt, 4, "int")
-
-    if (cx < LT_MidX || cx > LT_MidX + LT_MidW || cy < LT_MidViewportTop || cy > LT_MidViewportBottom)
+    prect := Buffer(16, 0)
+    DllCall("GetWindowRect", "ptr", LT_MidPanel.Hwnd, "ptr", prect)
+    left := NumGet(prect, 0, "int")
+    top := NumGet(prect, 4, "int")
+    right := NumGet(prect, 8, "int")
+    bottom := NumGet(prect, 12, "int")
+    if (sx < left || sx > right || sy < top || sy > bottom)
         return
 
     raw := wParam & 0xFFFFFFFF
     deltaRaw := (raw >> 16) & 0xFFFF
     delta := (deltaRaw > 32767) ? (deltaRaw - 65536) : deltaRaw
 
-    ; Just update the target offset here -- cheap. A fast scroll gesture
-    ; (especially a trackpad) can fire this handler dozens of times a
-    ; second; doing the full Move/Visible pass on every single one is what
-    ; was causing the lag. Instead, coalesce a burst of wheel ticks into one
-    ; actual layout pass a few milliseconds after the last of them.
-    LT_ScrollOffset -= (delta / 120) * 40
-    if (LT_ScrollOffset < 0)
-        LT_ScrollOffset := 0
-    maxOff := LT_MaxScrollOffset()
-    if (LT_ScrollOffset > maxOff)
-        LT_ScrollOffset := maxOff
-
-    SetTimer(LT_ApplyScroll, -8)  ; re-arms/coalesces if called again before it fires
+    LT_ScrollTo(LT_ScrollOffset - (delta / 120) * 40)
 }
 
 LT_RegisterFieldControl(instId, fieldId, ctrl, meta) {
@@ -1635,6 +1713,7 @@ LT_EnsureGui() {
     global LT_GuiObj, LT_MidX, LT_MidW, LT_RightX, LT_RightW
     global LT_ListBoxCtrl, LT_AddBtnCtrl, LT_ClearBtnCtrl, LT_NewPatientBtnCtrl
     global LT_MidLabelCtrl, LT_RightLabelCtrl, LT_CopyBtnCtrl
+    global LT_MidPanel, LT_MidPanelX, LT_MidPanelY, LT_MidPanelW, LT_MidPanelH
 
     if (IsObject(LT_GuiObj))
         return
@@ -1656,6 +1735,14 @@ LT_EnsureGui() {
     LT_MidX := 10 + leftW + 15
     LT_MidW := 330
     LT_MidLabelCtrl := LT_GuiObj.Add("Text", "x" LT_MidX " y10 w" LT_MidW, "Active devices:")
+
+    ; The middle column is a real child window with its own native
+    ; scrollbar -- created once here and never destroyed again.
+    LT_MidPanelX := LT_MidX
+    LT_MidPanelY := 35
+    LT_MidPanelW := LT_MidW
+    LT_MidPanelH := 525
+    LT_MidPanel := LT_CreateMidPanel()
 
     LT_RightX := LT_MidX + LT_MidW + 15
     LT_RightW := 330
@@ -1685,7 +1772,7 @@ LT_OnResize(GuiObj, MinMax, W, H) {
 ; report pane at their new coordinates.
 LT_FlushResize() {
     global LT_GuiObj, LT_PendingResizeW, LT_PendingResizeH
-    global LT_MidX, LT_MidW, LT_RightX, LT_RightW, LT_MidViewportTop, LT_MidViewportBottom
+    global LT_MidX, LT_MidW, LT_RightX, LT_RightW
     global LT_ListBoxCtrl, LT_AddBtnCtrl, LT_ClearBtnCtrl, LT_NewPatientBtnCtrl
     global LT_MidLabelCtrl, LT_RightLabelCtrl, LT_CopyBtnCtrl
 
@@ -1701,6 +1788,7 @@ LT_FlushResize() {
     leftW := 180
     gap := 15
     minColW := 220
+    bottomMargin := 20
 
     remaining := W - leftX - leftW - gap * 2 - 20
     if (remaining < minColW * 2)
@@ -1719,7 +1807,6 @@ LT_FlushResize() {
     listY := 30
     buttonH := 28
     buttonGap := 5
-    bottomMargin := 20
     buttonsBlockH := 3 * buttonH + 2 * buttonGap
     listH := Max(100, H - listY - buttonsBlockH - buttonGap - bottomMargin)
     btn1Y := listY + listH + buttonGap
@@ -1731,10 +1818,10 @@ LT_FlushResize() {
     try LT_ClearBtnCtrl.Move(leftX, btn2Y, leftW, buttonH)
     try LT_NewPatientBtnCtrl.Move(leftX, btn3Y, leftW, buttonH)
 
-    ; middle column: header label + scrollable viewport
+    ; middle column: header label + the scrollable panel itself
     try LT_MidLabelCtrl.Move(midX, 10, midW)
-    LT_MidViewportTop := 35
-    LT_MidViewportBottom := Max(LT_MidViewportTop + 100, H - bottomMargin)
+    midPanelH := Max(100, H - 35 - bottomMargin)
+    LT_MoveMidPanel(midX, 35, midW, midPanelH)
 
     ; right column: header label + copy button
     try LT_RightLabelCtrl.Move(rightX, 10, rightW)
@@ -1752,57 +1839,67 @@ LT_FlushResize() {
 ; what stops an expand/collapse from silently scrolling the thing you just
 ; clicked out of view.
 LT_RebuildMiddleColumn(focusInstId := "") {
-    global LT_GuiObj, LT_MiddleControls, LT_FieldControls, LT_ControlRect, LT_InstanceOrder, LT_MidX, LT_MidW
-    global LT_ScrollOffset, LT_MidContentBottom, LT_MidViewportTop, LT_MidViewportBottom, LT_LastAppliedScroll
+    global LT_MidPanel, LT_MiddleControls, LT_FieldControls, LT_InstanceOrder
+    global LT_ScrollOffset, LT_MidContentBottom, LT_MidPanelClientW, LT_MidPanelClientH
 
-    LT_LastAppliedScroll := -1  ; force LT_ApplyScroll to actually run below, even if the offset is unchanged
+    if (!IsObject(LT_MidPanel))
+        return
 
     for ctrl in LT_MiddleControls {
         try ctrl.Visible := false
     }
     LT_MiddleControls := []
     LT_FieldControls := Map()
-    LT_ControlRect := Map()
+
+    margin := 10
+    contentW := LT_MidPanelClientW - margin
 
     instanceStartY := Map()
     instanceEndY := Map()
-    curY := 35
+    curY := margin
     for instId in LT_InstanceOrder {
         instanceStartY[instId] := curY
-        curY := LT_RenderInstancePanel(LT_GuiObj, LT_MidX, curY, LT_MidW, instId)
+        curY := LT_RenderInstancePanel(LT_MidPanel, 0, curY, contentW, instId)
         instanceEndY[instId] := curY
     }
     LT_MidContentBottom := curY
 
+    desiredOffset := LT_ScrollOffset
     if (focusInstId != "" && instanceStartY.Has(focusInstId)) {
         startY := instanceStartY[focusInstId]
         endY := instanceEndY[focusInstId]
-        viewportH := LT_MidViewportBottom - LT_MidViewportTop
-        viewTop := LT_ScrollOffset + LT_MidViewportTop
-        viewBottom := LT_ScrollOffset + LT_MidViewportBottom
+        viewportH := LT_MidPanelClientH
+        viewTop := desiredOffset
+        viewBottom := desiredOffset + viewportH
 
         if (startY < viewTop || endY > viewBottom) {
             if (endY - startY <= viewportH) {
                 ; the whole expanded block fits in the viewport -- prefer
                 ; showing all of it rather than just snapping to the top,
                 ; so a newly revealed row at the bottom isn't left hidden
-                LT_ScrollOffset := Max(0, endY - LT_MidViewportBottom)
-                if (startY - LT_ScrollOffset < LT_MidViewportTop)
-                    LT_ScrollOffset := Max(0, startY - LT_MidViewportTop)
+                desiredOffset := Max(0, endY - viewportH)
+                if (startY - desiredOffset < 0)
+                    desiredOffset := Max(0, startY)
             } else {
                 ; doesn't fit regardless -- anchor to the top and let the
                 ; person scroll the rest, same as before
-                LT_ScrollOffset := Max(0, startY - LT_MidViewportTop)
+                desiredOffset := Max(0, startY)
             }
         }
     }
 
-    maxOff := LT_MaxScrollOffset()
-    if (LT_ScrollOffset > maxOff)
-        LT_ScrollOffset := maxOff
-    if (LT_ScrollOffset < 0)
-        LT_ScrollOffset := 0
+    maxOff := Max(0, LT_MidContentBottom - LT_MidPanelClientH)
+    if (desiredOffset > maxOff)
+        desiredOffset := maxOff
+    if (desiredOffset < 0)
+        desiredOffset := 0
 
-    LT_ApplyScroll()
+    ; Newly (re)created controls sit at their raw/unscrolled positions --
+    ; one ScrollWindow call brings the whole panel to the resolved offset.
+    if (desiredOffset > 0)
+        try DllCall("ScrollWindow", "ptr", LT_MidPanel.Hwnd, "int", 0, "int", -desiredOffset, "ptr", 0, "ptr", 0)
+    LT_ScrollOffset := desiredOffset
+    LT_UpdateScrollInfo()
+
     LT_UpdateOutputBoxOnly()
 }
