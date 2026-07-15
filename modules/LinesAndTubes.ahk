@@ -233,6 +233,47 @@ LT_ProjectingTipGroups := [
     ])
 ]
 
+; PICC-specific tip locations. Unlike the shared central-line set, this is
+; capped at the right ventricle (a PICC has no business projecting into the
+; pulmonary arteries) and every phrase uniformly reads "projects to the X" --
+; true regardless of location, and specific to PICC (IJ/SCV use "projecting
+; over", Port uses the same "projecting over" set minus PA/interlobar).
+LT_PICCTipGroups := [
+    Map("groupLabel", "Brachiocephalic vein", "states", [
+        Map("label", "Right brachiocephalic vein", "short", "Right", "phrase", "projects to the right brachiocephalic vein"),
+        Map("label", "Left brachiocephalic vein", "short", "Left", "phrase", "projects to the left brachiocephalic vein")
+    ]),
+    Map("groupLabel", "Confluence of brachiocephalic veins", "states", [
+        Map("label", "Confluence of the brachiocephalic veins", "phrase", "projects to the confluence of the brachiocephalic veins")
+    ]),
+    Map("groupLabel", "SVC", "states", [
+        Map("label", "SVC (unspecified)", "short", "(unspecified)", "phrase", "projects to the superior vena cava"),
+        Map("label", "Proximal SVC", "short", "Proximal", "phrase", "projects to the proximal superior vena cava"),
+        Map("label", "Mid SVC", "short", "Mid", "phrase", "projects to the mid superior vena cava"),
+        Map("label", "Distal SVC", "short", "Distal", "phrase", "projects to the distal superior vena cava")
+    ]),
+    Map("groupLabel", "Cavoatrial junction", "states", [
+        Map("label", "Superior cavoatrial junction", "short", "Superior", "phrase", "projects to the superior cavoatrial junction"),
+        Map("label", "Inferior cavoatrial junction", "short", "Inferior", "phrase", "projects to the inferior cavoatrial junction")
+    ]),
+    Map("groupLabel", "Right atrium", "states", [
+        Map("label", "Right atrium (unspecified)", "short", "(unspecified)", "phrase", "projects to the right atrium"),
+        Map("label", "Upper right atrium", "short", "Upper", "phrase", "projects to the upper right atrium"),
+        Map("label", "Mid right atrium", "short", "Mid", "phrase", "projects to the mid right atrium"),
+        Map("label", "Lower right atrium", "short", "Lower", "phrase", "projects to the lower right atrium")
+    ]),
+    Map("groupLabel", "Right ventricle", "states", [
+        Map("label", "Right ventricle", "phrase", "projects to the right ventricle")
+    ]),
+    Map("groupLabel", "Clavicle", "states", [
+        Map("label", "Right clavicle", "short", "Right", "phrase", "projects to the right clavicle"),
+        Map("label", "Left clavicle", "short", "Left", "phrase", "projects to the left clavicle")
+    ]),
+    Map("groupLabel", "Other", "states", [
+        Map("label", "Other", "phrase", "__OTHER__")
+    ])
+]
+
 LT_EntericTipGroups := [
     Map("groupLabel", "Esophagus", "states", [
         Map("label", "Esophagus (unspecified)", "short", "(unspecified)", "phrase", "in the esophagus"),
@@ -323,6 +364,9 @@ LT_EpiduralGroups := [
         Map("label", "Lumbar spine (unspecified)", "short", "(unspecified)", "phrase", "over the lumbar spine"),
         Map("label", "Upper lumbar spine", "short", "Upper", "phrase", "over the upper lumbar spine"),
         Map("label", "Mid lumbar spine", "short", "Mid", "phrase", "over the mid lumbar spine")
+    ]),
+    Map("groupLabel", "Other", "states", [
+        Map("label", "Other", "phrase", "__OTHER__")
     ])
 ]
 
@@ -363,7 +407,7 @@ Show_LinesAndTubes(*) {
 ; ============================================================================
 
 LT_BuildDeviceDefs() {
-    global LT_CentralTipGroups, LT_ProjectingTipGroups, LT_EntericTipGroups, LT_FeedingTipGroups, LT_EpiduralGroups
+    global LT_CentralTipGroups, LT_ProjectingTipGroups, LT_PICCTipGroups, LT_EntericTipGroups, LT_FeedingTipGroups, LT_EpiduralGroups
 
     defs := Map()
 
@@ -450,7 +494,7 @@ LT_BuildDeviceDefs() {
             Map("id", "laterality", "type", "buttons", "label", "Side",
                 "options", ["Right", "Left"]),
             Map("id", "tip", "type", "grouped", "label", "Tip location",
-                "groups", LT_BuildSubclavianTipGroups())
+                "groups", LT_PICCTipGroups)
         ],
         "sentenceFn", (fields) => LT_Sentence_CentralLine(fields, "peripherally inserted central catheter (PICC)"),
         "removalNoun", (fields) => LT_RemovalNoun_CentralLine(fields, "peripherally inserted central catheter (PICC)")
@@ -468,7 +512,7 @@ LT_BuildDeviceDefs() {
             Map("id", "portType", "type", "buttons", "label", "Type",
                 "options", ["Single", "Dual"]),
             Map("id", "tip", "type", "grouped", "label", "Tip location",
-                "groups", LT_BuildPortTipGroups())
+                "groups", LT_BuildProjectingPortTipGroups())
         ],
         "sentenceFn", LT_Sentence_Port,
         "removalNoun", LT_RemovalNoun_Port
@@ -487,7 +531,8 @@ LT_BuildDeviceDefs() {
                     Map("label", "Inferior cavoatrial junction", "short", "Inferior", "phrase", "at the inferior cavoatrial junction"),
                     Map("label", "Right atrium", "short", "Right", "phrase", "in the right atrium"),
                     Map("label", "Superior cavoatrial junction", "short", "Superior", "phrase", "at the superior cavoatrial junction"),
-                    Map("label", "SVC", "phrase", "in the superior vena cava")
+                    Map("label", "SVC", "phrase", "in the superior vena cava"),
+                    Map("label", "Other", "phrase", "__OTHER__")
                 ])
         ],
         "sentenceFn", LT_Sentence_VECMO,
@@ -520,7 +565,7 @@ LT_BuildDeviceDefs() {
             Map("id", "deviceType", "type", "buttons", "label", "Type",
                 "options", ["Chest tube", "Pleural catheter", "Pleural pigtail"]),
             Map("id", "location", "type", "buttons", "label", "Location",
-                "options", ["Apical", "Basal", "Mid", "Chest wall"]),
+                "options", ["Apical", "Basal", "Mid", "Chest wall", "Other"]),
             Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
         ],
         "sentenceFn", LT_Sentence_Pleural,
@@ -649,7 +694,7 @@ LT_BuildDeviceDefs() {
         "label", "Abdominal drain",
         "fields", [
             Map("id", "location", "type", "buttons", "label", "Location",
-                "options", ["Left upper quadrant", "Epigastric", "Right upper quadrant", "Subhepatic"]),
+                "options", ["Left upper quadrant", "Epigastric", "Right upper quadrant", "Subhepatic", "Other"]),
             Map("id", "deviceType", "type", "buttons", "label", "Type",
                 "options", ["Pigtail catheter", "Drain"]),
             Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
@@ -723,6 +768,27 @@ LT_BuildPortTipGroups() {
     excluded := ["Pulmonary artery", "Right pulmonary artery", "Left pulmonary artery", "Interlobar artery"]
     arr := []
     for grp in LT_CentralTipGroups {
+        skip := false
+        for ex in excluded {
+            if (grp["groupLabel"] = ex) {
+                skip := true
+                break
+            }
+        }
+        if (!skip)
+            arr.Push(grp)
+    }
+    return arr
+}
+
+; Port catheters aren't placed under real-time US guidance the way IJ/SCV
+; lines are, so their tip position is described the same "projecting over"
+; way, not "in"/"at".
+LT_BuildProjectingPortTipGroups() {
+    global LT_ProjectingTipGroups
+    excluded := ["Pulmonary artery", "Right pulmonary artery", "Left pulmonary artery", "Interlobar artery"]
+    arr := []
+    for grp in LT_ProjectingTipGroups {
         skip := false
         for ex in excluded {
             if (grp["groupLabel"] = ex) {
@@ -877,7 +943,7 @@ LT_Sentence_Enteric(fields, deviceLabel) {
     loc := fields.Get("location_phrase", "")
 
     if (loc = "")
-        return deviceLabel " tip location not specified."
+        return deviceLabel "."
 
     if (loc = "__OTHER__")
         return deviceLabel " tip is _____."
@@ -918,7 +984,7 @@ LT_Sentence_Trach(fields) {
         return "Tracheostomy tube tip is at the thoracic inlet."
     if (form = "Above carina")
         return "Tracheostomy tube tip is _____ above the carina."
-    return "Tracheostomy tube tip location not specified."
+    return "Tracheostomy tube."
 }
 
 LT_Sentence_Pleural(fields) {
@@ -928,7 +994,7 @@ LT_Sentence_Pleural(fields) {
     count := fields.Get("count", 1)
 
     sideText := (side != "") ? StrLower(side) " " : ""
-    locText := (location != "") ? StrLower(location) " " : ""
+    locText := (location = "Other") ? "_____ " : (location != "") ? StrLower(location) " " : ""
     typeNoun := (deviceType != "") ? StrLower(deviceType) : "chest tube"
     if (count > 1)
         typeNoun .= "s"
@@ -954,7 +1020,7 @@ LT_RemovalNoun_Pleural(fields) {
 LT_Sentence_VECMO(fields) {
     approach := fields.Get("approach", "")
     tipPhrase := fields.Get("tip_phrase", "")
-    if (tipPhrase = "")
+    if (tipPhrase = "" || tipPhrase = "__OTHER__")
         tipPhrase := "_____"
 
     approachText := (approach != "") ? StrLower(approach) " approach " : ""
@@ -1026,7 +1092,7 @@ LT_Sentence_Impella(fields) {
 
 LT_Sentence_Epidural(fields) {
     phrase := fields.Get("tip_phrase", "")
-    if (phrase = "")
+    if (phrase = "" || phrase = "__OTHER__")
         phrase := "_____"
     return "Epidural catheter tip is " phrase "."
 }
@@ -1123,7 +1189,13 @@ LT_Sentence_Abdominal(fields) {
     deviceType := fields.Get("deviceType", "")
     count := fields.Get("count", 1)
 
-    locText := (location != "") ? StrLower(location) " " : ""
+    if (location = "Other")
+        locText := "_____ "
+    else if (location != "")
+        locText := StrLower(location) " "
+    else
+        locText := "upper abdominal "
+
     typeNoun := (deviceType != "") ? StrLower(deviceType) : "drain"
     if (count > 1)
         typeNoun .= "s"
@@ -1139,7 +1211,12 @@ LT_RemovalNoun_Abdominal(fields) {
     location := fields.Get("location", "")
     deviceType := fields.Get("deviceType", "")
     count := fields.Get("count", 1)
-    locText := (location != "") ? StrLower(location) " " : ""
+    if (location = "Other")
+        locText := "_____ "
+    else if (location != "")
+        locText := StrLower(location) " "
+    else
+        locText := "upper abdominal "
     typeNoun := (deviceType != "") ? StrLower(deviceType) : "drain"
     if (count > 1)
         typeNoun .= "s"
@@ -1200,6 +1277,18 @@ LT_JoinRemovalSentence(nouns) {
     return "Prior " joined " " verb " now absent."
 }
 
+; Every device instance has an "Add other/unlisted finding" toggle,
+; regardless of what fields it otherwise has (even zero-field devices like
+; the loop/Zio monitor). When checked, tack on a blank placeholder for
+; dictating whatever else needs to be said about it.
+LT_AppendOtherNote(s, fields) {
+    if (!fields.Get("otherNote", false))
+        return s
+    if (SubStr(s, -1) = ".")
+        return SubStr(s, 1, StrLen(s) - 1) " _____."
+    return s " _____"
+}
+
 LT_BuildOutput() {
     global LT_DeviceOrder, LT_InstanceOrder, LT_Instances, LT_DeviceDefs
 
@@ -1220,8 +1309,10 @@ LT_BuildOutput() {
             } else {
                 sentenceFn := def["sentenceFn"]
                 s := sentenceFn(fields)
-                if (s != "")
+                if (s != "") {
+                    s := LT_AppendOtherNote(s, fields)
                     lines.Push(s)
+                }
             }
         }
     }
@@ -1242,7 +1333,13 @@ LT_BuildOutput() {
 ; ============================================================================
 
 LT_AddInstance(deviceKey) {
-    global LT_Instances, LT_InstanceOrder, LT_InstanceCounter
+    global LT_Instances, LT_InstanceOrder, LT_InstanceCounter, LT_GuiObj
+
+    ; From the moment a device is added, keep the window pinned above other
+    ; windows (e.g. the PACS viewer) so it's usable while looking at images.
+    ; Cleared on Close or New Patient -- see those handlers.
+    if (IsObject(LT_GuiObj))
+        try LT_GuiObj.Opt("+AlwaysOnTop")
 
     ; collapse everything currently in the list so the newly added device
     ; is the only one expanded
@@ -1319,13 +1416,13 @@ LT_InstanceDisplayLabel(instId) {
             sameKeyIds.Push(id)
     }
     if (sameKeyIds.Length <= 1)
-        return def["label"]
+        return def.Get("shortLabel", def["label"])
 
     for i, id in sameKeyIds {
         if (id = instId)
-            return def["label"] " #" i
+            return def.Get("shortLabel", def["label"]) " #" i
     }
-    return def["label"]
+    return def.Get("shortLabel", def["label"])
 }
 
 
@@ -1528,6 +1625,7 @@ LT_RenderOutputPane() {
             s := sentenceFn(fields)
             if (s = "")
                 continue
+            s := LT_AppendOtherNote(s, fields)
 
             approxRows := Ceil(StrLen(s) / 50)
             h := Max(20, approxRows * 16 + 6)
@@ -1988,6 +2086,11 @@ LT_RenderInstancePanel(g, x, y, w, instId) {
     cb.OnEvent("Click", LT_FieldToggle.Bind(instId, "removed"))
     curY += 26
 
+    otherCb := LT_AddMid(g, "CheckBox", "x" innerX " y" curY " w200", "Add info")
+    otherCb.Value := fields.Get("otherNote", false) ? 1 : 0
+    otherCb.OnEvent("Click", LT_FieldToggle.Bind(instId, "otherNote"))
+    curY += 26
+
     if (isRemoved) {
         LT_AddMid(g, "Text", "x" innerX " y" curY " w" (innerW - 20), "(marked as now absent)")
         curY += 22
@@ -2010,6 +2113,16 @@ LT_RenderInstancePanel(g, x, y, w, instId) {
 
 ; Builds the window shell exactly once. Left/right columns are static;
 ; only the middle column's contents change after this.
+; Closing the window is the other way (besides New Patient) to end the
+; "pinned above everything" period.
+LT_OnGuiClose(*) {
+    global LT_GuiObj
+    if (IsObject(LT_GuiObj)) {
+        try LT_GuiObj.Opt("-AlwaysOnTop")
+        LT_GuiObj.Hide()
+    }
+}
+
 LT_EnsureGui() {
     global LT_GuiObj, LT_MidX, LT_MidW, LT_RightX, LT_RightW
     global LT_ListBoxCtrl, LT_AddBtnCtrl, LT_ClearBtnCtrl, LT_NewPatientBtnCtrl
@@ -2051,9 +2164,20 @@ LT_EnsureGui() {
     LT_CopyBtnCtrl := LT_GuiObj.Add("Button", "x" LT_RightX " y480 w" LT_RightW " h30", "Copy to Clipboard")
     LT_CopyBtnCtrl.OnEvent("Click", LT_CopyOutput)
 
-    LT_GuiObj.OnEvent("Close", (*) => LT_GuiObj.Hide())
+    LT_GuiObj.OnEvent("Close", LT_OnGuiClose)
     LT_GuiObj.OnEvent("Size", LT_OnResize)
-    LT_GuiObj.Show("w" (LT_RightX + LT_RightW + 20) " h580")
+
+    defaultW := LT_RightX + LT_RightW + 20
+    defaultH := Round(580 * 1.25)  ; 25% taller, so the pick list fits without scrolling
+    LT_GuiObj.Show("w" defaultW " h" defaultH)
+
+    ; The controls above were laid out for the old default height; reflow
+    ; immediately (reusing the same logic a manual resize triggers) so the
+    ; extra height is actually used rather than left as dead space.
+    global LT_PendingResizeW, LT_PendingResizeH
+    LT_PendingResizeW := defaultW
+    LT_PendingResizeH := defaultH
+    LT_FlushResize()
 }
 
 ; A resize drag fires the Size event continuously -- debounce it the same
