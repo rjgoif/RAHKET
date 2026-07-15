@@ -97,7 +97,7 @@ LT_PickListDeviceKeys := []
 ; grouping/dividers -- one source of truth so they can't drift apart.
 LT_DeviceCategories := [
     Map("name", "Airway", "keys", ["ETT", "TRACH"]),
-    Map("name", "GI tubes", "keys", ["ENTERIC", "FEEDING"]),
+    Map("name", "GI tubes", "keys", ["ENTERIC", "FEEDING", "GGJ"]),
     Map("name", "Chest tubes & drains", "keys", ["PLEURAL", "MEDIASTINAL"]),
     Map("name", "Vascular lines", "keys", ["IJ", "SCV", "PICC", "PORT", "VECMO", "IABP"]),
     Map("name", "Cardiac devices", "keys", ["IMPELLA", "LVAD", "EPIWIRE", "GENERATOR", "RETAINEDLEADS", "PADS", "LOOPZIO", "LEADLESS"]),
@@ -447,6 +447,18 @@ LT_BuildDeviceDefs() {
         "removalNoun", (fields) => Map("text", fields.Get("weighted", false) ? "weighted feeding tube" : "feeding tube", "plural", false)
     )
 
+    defs["GGJ"] := Map(
+        "label", "G/GJ/J tube",
+        "fields", [
+            Map("id", "tubeType", "type", "buttons", "label", "Type",
+                "options", ["G tube", "GJ tube", "J tube"]),
+            Map("id", "location", "type", "grouped", "label", "Tip location",
+                "groups", LT_BuildGGJTipGroups())
+        ],
+        "sentenceFn", LT_Sentence_GGJ,
+        "removalNoun", LT_RemovalNoun_GGJ
+    )
+
     defs["IJ"] := Map(
         "label", "Internal jugular catheter",
         "shortLabel", "IJ catheter",
@@ -761,6 +773,39 @@ LT_BuildProjectingSubclavianGroups() {
     return arr
 }
 
+; G/GJ/J tube shares the feeding tube's stomach-and-beyond locations, minus
+; esophagus, the esophagogastric junction, gastric conduit, and the
+; malpositioned-bronchus option -- none of those apply to a tube that
+; starts in the stomach.
+LT_BuildGGJTipGroups() {
+    global LT_FeedingTipGroups
+    excluded := ["Esophagus", "Esophagogastric junction", "Gastric conduit", "Malpositioned bronchus"]
+    arr := []
+    for grp in LT_FeedingTipGroups {
+        if (grp["groupLabel"] = "Stomach (tip and side port)") {
+            ; G/GJ/J tubes have no side port -- tip location only, not the
+            ; "tip and side port" phrasing feeding tubes use
+            arr.Push(Map("groupLabel", "Stomach", "states", [
+                Map("label", "Stomach (unspecified)", "short", "(unspecified)", "phrase", "in the stomach"),
+                Map("label", "Proximal stomach", "short", "Proximal", "phrase", "in the proximal stomach"),
+                Map("label", "Mid stomach", "short", "Mid", "phrase", "in the mid stomach"),
+                Map("label", "Distal stomach", "short", "Distal", "phrase", "in the distal stomach")
+            ]))
+            continue
+        }
+        skip := false
+        for ex in excluded {
+            if (grp["groupLabel"] = ex) {
+                skip := true
+                break
+            }
+        }
+        if (!skip)
+            arr.Push(grp)
+    }
+    return arr
+}
+
 ; Port catheters get the same central-line families minus the pulmonary
 ; artery ones (a port catheter tip doesn't sit in the PA).
 LT_BuildPortTipGroups() {
@@ -976,6 +1021,23 @@ LT_Sentence_Feeding(fields) {
         base := SubStr(base, 1, StrLen(base) - 1) ", with stylet in place."
 
     return base
+}
+
+LT_GGJLabel(fields) {
+    tubeType := fields.Get("tubeType", "")
+    if (tubeType = "GJ tube")
+        return "Gastrojejunostomy tube"
+    if (tubeType = "J tube")
+        return "Jejunostomy tube"
+    return "Gastrostomy tube"
+}
+
+LT_Sentence_GGJ(fields) {
+    return LT_Sentence_Enteric(fields, LT_GGJLabel(fields))
+}
+
+LT_RemovalNoun_GGJ(fields) {
+    return Map("text", StrLower(LT_GGJLabel(fields)), "plural", false)
 }
 
 LT_Sentence_Trach(fields) {
@@ -1289,6 +1351,14 @@ LT_AppendOtherNote(s, fields) {
     return s " _____"
 }
 
+; No terminal periods on any output line -- strip one if a sentence
+; function (or the removal-grouping sentence) happens to end with one.
+LT_StripTrailingPeriod(s) {
+    if (SubStr(s, -1) = ".")
+        return SubStr(s, 1, StrLen(s) - 1)
+    return s
+}
+
 LT_BuildOutput() {
     global LT_DeviceOrder, LT_InstanceOrder, LT_Instances, LT_DeviceDefs
 
@@ -1311,6 +1381,7 @@ LT_BuildOutput() {
                 s := sentenceFn(fields)
                 if (s != "") {
                     s := LT_AppendOtherNote(s, fields)
+                    s := LT_StripTrailingPeriod(s)
                     lines.Push(s)
                 }
             }
@@ -1318,7 +1389,7 @@ LT_BuildOutput() {
     }
 
     if (removalNouns.Length > 0)
-        lines.Push(LT_JoinRemovalSentence(removalNouns))
+        lines.Push(LT_StripTrailingPeriod(LT_JoinRemovalSentence(removalNouns)))
 
     out := ""
     for line in lines
@@ -1626,6 +1697,7 @@ LT_RenderOutputPane() {
             if (s = "")
                 continue
             s := LT_AppendOtherNote(s, fields)
+            s := LT_StripTrailingPeriod(s)
 
             approxRows := Ceil(StrLen(s) / 50)
             h := Max(20, approxRows * 16 + 6)
@@ -1638,7 +1710,7 @@ LT_RenderOutputPane() {
     }
 
     if (removalNouns.Length > 0) {
-        s := LT_JoinRemovalSentence(removalNouns)
+        s := LT_StripTrailingPeriod(LT_JoinRemovalSentence(removalNouns))
         approxRows := Ceil(StrLen(s) / 50)
         h := Max(20, approxRows * 16 + 6)
         txt := LT_GuiObj.Add("Text", "x" LT_RightX " y" y " w" LT_RightW " h" h, s)
