@@ -88,9 +88,27 @@ LT_MidContentBottom := 10
 ; jumps to and expands the matching device in the middle column
 LT_RightControls := []
 
+; Parallel to the device picker ListBox's items: "" for a category header
+; row, a device key otherwise. Rebuilt by LT_DeviceLabelList.
+LT_PickListDeviceKeys := []
+
 ; Canonical output order (also the order devices are listed on the left)
-LT_DeviceOrder := ["ETT", "TRACH", "ENTERIC", "FEEDING", "IJ", "SCV", "PICC", "PORT",
-    "IMPELLA", "LVAD", "EPIWIRE", "GENERATOR", "RETAINEDLEADS", "PADS", "PLEURAL", "MEDIASTINAL", "EPIDURAL"]
+; Categories drive both the report's device order and the left-side picker's
+; grouping/dividers -- one source of truth so they can't drift apart.
+LT_DeviceCategories := [
+    Map("name", "Airway", "keys", ["ETT", "TRACH"]),
+    Map("name", "GI tubes", "keys", ["ENTERIC", "FEEDING"]),
+    Map("name", "Chest tubes & drains", "keys", ["PLEURAL", "MEDIASTINAL"]),
+    Map("name", "Vascular lines", "keys", ["IJ", "SCV", "PICC", "PORT", "VECMO", "IABP"]),
+    Map("name", "Cardiac devices", "keys", ["IMPELLA", "LVAD", "EPIWIRE", "GENERATOR", "RETAINEDLEADS", "PADS", "LOOPZIO", "LEADLESS"]),
+    Map("name", "Other", "keys", ["EPIDURAL", "ABDOMINAL", "NEPHROSTOMY", "OTHER"])
+]
+
+LT_DeviceOrder := []
+for LT_Cat_ in LT_DeviceCategories {
+    for LT_Key_ in LT_Cat_["keys"]
+        LT_DeviceOrder.Push(LT_Key_)
+}
 
 OnMessage(0x20A, LT_OnMouseWheel)  ; WM_MOUSEWHEEL
 OnMessage(0x115, LT_OnVScroll)     ; WM_VSCROLL
@@ -106,52 +124,109 @@ OnMessage(0x115, LT_OnVScroll)     ; WM_VSCROLL
 
 LT_CentralTipGroups := [
     Map("groupLabel", "Brachiocephalic vein", "states", [
-        Map("label", "Right brachiocephalic vein", "phrase", "over the right brachiocephalic vein"),
-        Map("label", "Left brachiocephalic vein", "phrase", "over the left brachiocephalic vein")
+        Map("label", "Right brachiocephalic vein", "short", "Right", "phrase", "over the right brachiocephalic vein"),
+        Map("label", "Left brachiocephalic vein", "short", "Left", "phrase", "over the left brachiocephalic vein")
     ]),
     Map("groupLabel", "Confluence of brachiocephalic veins", "states", [
         Map("label", "Confluence of the brachiocephalic veins", "phrase", "at the confluence of the brachiocephalic veins")
     ]),
     Map("groupLabel", "SVC", "states", [
-        Map("label", "SVC (unspecified)", "phrase", "in the superior vena cava"),
-        Map("label", "Proximal SVC", "phrase", "in the proximal superior vena cava"),
-        Map("label", "Mid SVC", "phrase", "in the mid superior vena cava"),
-        Map("label", "Distal SVC", "phrase", "in the distal superior vena cava")
+        Map("label", "SVC (unspecified)", "short", "(unspecified)", "phrase", "in the superior vena cava"),
+        Map("label", "Proximal SVC", "short", "Proximal", "phrase", "in the proximal superior vena cava"),
+        Map("label", "Mid SVC", "short", "Mid", "phrase", "in the mid superior vena cava"),
+        Map("label", "Distal SVC", "short", "Distal", "phrase", "in the distal superior vena cava")
     ]),
     Map("groupLabel", "Cavoatrial junction", "states", [
-        Map("label", "Superior cavoatrial junction", "phrase", "at the superior cavoatrial junction"),
-        Map("label", "Inferior cavoatrial junction", "phrase", "at the inferior cavoatrial junction")
+        Map("label", "Superior cavoatrial junction", "short", "Superior", "phrase", "at the superior cavoatrial junction"),
+        Map("label", "Inferior cavoatrial junction", "short", "Inferior", "phrase", "at the inferior cavoatrial junction")
     ]),
     Map("groupLabel", "Right atrium", "states", [
-        Map("label", "Right atrium (unspecified)", "phrase", "in the right atrium"),
-        Map("label", "Upper right atrium", "phrase", "in the upper right atrium"),
-        Map("label", "Mid right atrium", "phrase", "in the mid right atrium"),
-        Map("label", "Lower right atrium", "phrase", "in the lower right atrium")
+        Map("label", "Right atrium (unspecified)", "short", "(unspecified)", "phrase", "in the right atrium"),
+        Map("label", "Upper right atrium", "short", "Upper", "phrase", "in the upper right atrium"),
+        Map("label", "Mid right atrium", "short", "Mid", "phrase", "in the mid right atrium"),
+        Map("label", "Lower right atrium", "short", "Lower", "phrase", "in the lower right atrium")
     ]),
     Map("groupLabel", "Right ventricle", "states", [
-        Map("label", "Right ventricle", "phrase", "in the right ventricle")
+        Map("label", "Right ventricle", "short", "Right", "phrase", "in the right ventricle")
     ]),
     Map("groupLabel", "Pulmonary artery", "states", [
-        Map("label", "Pulmonary artery (unspecified)", "phrase", "in the pulmonary artery"),
-        Map("label", "Proximal pulmonary artery", "phrase", "in the proximal pulmonary artery"),
-        Map("label", "Mid pulmonary artery", "phrase", "in the mid pulmonary artery"),
-        Map("label", "Distal pulmonary artery", "phrase", "in the distal pulmonary artery")
+        Map("label", "Pulmonary artery (unspecified)", "short", "(unspecified)", "phrase", "in the pulmonary artery"),
+        Map("label", "Proximal pulmonary artery", "short", "Proximal", "phrase", "in the proximal pulmonary artery"),
+        Map("label", "Mid pulmonary artery", "short", "Mid", "phrase", "in the mid pulmonary artery"),
+        Map("label", "Distal pulmonary artery", "short", "Distal", "phrase", "in the distal pulmonary artery")
     ]),
     Map("groupLabel", "Right pulmonary artery", "states", [
-        Map("label", "Right pulmonary artery (unspecified)", "phrase", "in the right pulmonary artery"),
-        Map("label", "Proximal right pulmonary artery", "phrase", "in the proximal right pulmonary artery"),
-        Map("label", "Mid right pulmonary artery", "phrase", "in the mid right pulmonary artery"),
-        Map("label", "Distal right pulmonary artery", "phrase", "in the distal right pulmonary artery")
+        Map("label", "Right pulmonary artery (unspecified)", "short", "(unspecified)", "phrase", "in the right pulmonary artery"),
+        Map("label", "Proximal right pulmonary artery", "short", "Proximal", "phrase", "in the proximal right pulmonary artery"),
+        Map("label", "Mid right pulmonary artery", "short", "Mid", "phrase", "in the mid right pulmonary artery"),
+        Map("label", "Distal right pulmonary artery", "short", "Distal", "phrase", "in the distal right pulmonary artery")
     ]),
     Map("groupLabel", "Left pulmonary artery", "states", [
-        Map("label", "Left pulmonary artery (unspecified)", "phrase", "in the left pulmonary artery"),
-        Map("label", "Proximal left pulmonary artery", "phrase", "in the proximal left pulmonary artery"),
-        Map("label", "Mid left pulmonary artery", "phrase", "in the mid left pulmonary artery"),
-        Map("label", "Distal left pulmonary artery", "phrase", "in the distal left pulmonary artery")
+        Map("label", "Left pulmonary artery (unspecified)", "short", "(unspecified)", "phrase", "in the left pulmonary artery"),
+        Map("label", "Proximal left pulmonary artery", "short", "Proximal", "phrase", "in the proximal left pulmonary artery"),
+        Map("label", "Mid left pulmonary artery", "short", "Mid", "phrase", "in the mid left pulmonary artery"),
+        Map("label", "Distal left pulmonary artery", "short", "Distal", "phrase", "in the distal left pulmonary artery")
     ]),
     Map("groupLabel", "Interlobar artery", "states", [
-        Map("label", "Right interlobar artery", "phrase", "in the right interlobar artery"),
-        Map("label", "Left interlobar artery", "phrase", "in the left interlobar artery")
+        Map("label", "Right interlobar artery", "short", "Right", "phrase", "in the right interlobar artery"),
+        Map("label", "Left interlobar artery", "short", "Left", "phrase", "in the left interlobar artery")
+    ]),
+    Map("groupLabel", "Other", "states", [
+        Map("label", "Other", "phrase", "__OTHER__")
+    ])
+]
+
+; Same families/labels as LT_CentralTipGroups, but every phrase uses
+; "projecting over X" uniformly. IJ and SCV catheter tips are described
+; this way; PICC keeps the original in/at/over mix above.
+LT_ProjectingTipGroups := [
+    Map("groupLabel", "Brachiocephalic vein", "states", [
+        Map("label", "Right brachiocephalic vein", "short", "Right", "phrase", "projecting over the right brachiocephalic vein"),
+        Map("label", "Left brachiocephalic vein", "short", "Left", "phrase", "projecting over the left brachiocephalic vein")
+    ]),
+    Map("groupLabel", "Confluence of brachiocephalic veins", "states", [
+        Map("label", "Confluence of the brachiocephalic veins", "phrase", "projecting over the confluence of the brachiocephalic veins")
+    ]),
+    Map("groupLabel", "SVC", "states", [
+        Map("label", "SVC (unspecified)", "short", "(unspecified)", "phrase", "projecting over the superior vena cava"),
+        Map("label", "Proximal SVC", "short", "Proximal", "phrase", "projecting over the proximal superior vena cava"),
+        Map("label", "Mid SVC", "short", "Mid", "phrase", "projecting over the mid superior vena cava"),
+        Map("label", "Distal SVC", "short", "Distal", "phrase", "projecting over the distal superior vena cava")
+    ]),
+    Map("groupLabel", "Cavoatrial junction", "states", [
+        Map("label", "Superior cavoatrial junction", "short", "Superior", "phrase", "projecting over the superior cavoatrial junction"),
+        Map("label", "Inferior cavoatrial junction", "short", "Inferior", "phrase", "projecting over the inferior cavoatrial junction")
+    ]),
+    Map("groupLabel", "Right atrium", "states", [
+        Map("label", "Right atrium (unspecified)", "short", "(unspecified)", "phrase", "projecting over the right atrium"),
+        Map("label", "Upper right atrium", "short", "Upper", "phrase", "projecting over the upper right atrium"),
+        Map("label", "Mid right atrium", "short", "Mid", "phrase", "projecting over the mid right atrium"),
+        Map("label", "Lower right atrium", "short", "Lower", "phrase", "projecting over the lower right atrium")
+    ]),
+    Map("groupLabel", "Right ventricle", "states", [
+        Map("label", "Right ventricle", "short", "Right", "phrase", "projecting over the right ventricle")
+    ]),
+    Map("groupLabel", "Pulmonary artery", "states", [
+        Map("label", "Pulmonary artery (unspecified)", "short", "(unspecified)", "phrase", "projecting over the pulmonary artery"),
+        Map("label", "Proximal pulmonary artery", "short", "Proximal", "phrase", "projecting over the proximal pulmonary artery"),
+        Map("label", "Mid pulmonary artery", "short", "Mid", "phrase", "projecting over the mid pulmonary artery"),
+        Map("label", "Distal pulmonary artery", "short", "Distal", "phrase", "projecting over the distal pulmonary artery")
+    ]),
+    Map("groupLabel", "Right pulmonary artery", "states", [
+        Map("label", "Right pulmonary artery (unspecified)", "short", "(unspecified)", "phrase", "projecting over the right pulmonary artery"),
+        Map("label", "Proximal right pulmonary artery", "short", "Proximal", "phrase", "projecting over the proximal right pulmonary artery"),
+        Map("label", "Mid right pulmonary artery", "short", "Mid", "phrase", "projecting over the mid right pulmonary artery"),
+        Map("label", "Distal right pulmonary artery", "short", "Distal", "phrase", "projecting over the distal right pulmonary artery")
+    ]),
+    Map("groupLabel", "Left pulmonary artery", "states", [
+        Map("label", "Left pulmonary artery (unspecified)", "short", "(unspecified)", "phrase", "projecting over the left pulmonary artery"),
+        Map("label", "Proximal left pulmonary artery", "short", "Proximal", "phrase", "projecting over the proximal left pulmonary artery"),
+        Map("label", "Mid left pulmonary artery", "short", "Mid", "phrase", "projecting over the mid left pulmonary artery"),
+        Map("label", "Distal left pulmonary artery", "short", "Distal", "phrase", "projecting over the distal left pulmonary artery")
+    ]),
+    Map("groupLabel", "Interlobar artery", "states", [
+        Map("label", "Right interlobar artery", "short", "Right", "phrase", "projecting over the right interlobar artery"),
+        Map("label", "Left interlobar artery", "short", "Left", "phrase", "projecting over the left interlobar artery")
     ]),
     Map("groupLabel", "Other", "states", [
         Map("label", "Other", "phrase", "__OTHER__")
@@ -160,31 +235,31 @@ LT_CentralTipGroups := [
 
 LT_EntericTipGroups := [
     Map("groupLabel", "Esophagus", "states", [
-        Map("label", "Esophagus (unspecified)", "phrase", "in the esophagus"),
-        Map("label", "Upper esophagus", "phrase", "in the upper esophagus"),
-        Map("label", "Mid esophagus", "phrase", "in the mid esophagus"),
-        Map("label", "Distal esophagus", "phrase", "in the distal esophagus")
+        Map("label", "Esophagus (unspecified)", "short", "(unspecified)", "phrase", "in the esophagus"),
+        Map("label", "Upper esophagus", "short", "Upper", "phrase", "in the upper esophagus"),
+        Map("label", "Mid esophagus", "short", "Mid", "phrase", "in the mid esophagus"),
+        Map("label", "Distal esophagus", "short", "Distal", "phrase", "in the distal esophagus")
     ]),
     Map("groupLabel", "Esophagogastric junction", "states", [
-        Map("label", "Near esophagogastric junction", "phrase", "near the esophagogastric junction"),
-        Map("label", "Above esophagogastric junction", "phrase", "above the esophagogastric junction"),
-        Map("label", "Below esophagogastric junction", "phrase", "below the esophagogastric junction")
+        Map("label", "Near esophagogastric junction", "short", "Near", "phrase", "near the esophagogastric junction"),
+        Map("label", "Above esophagogastric junction", "short", "Above", "phrase", "above the esophagogastric junction"),
+        Map("label", "Below esophagogastric junction", "short", "Below", "phrase", "below the esophagogastric junction")
     ]),
     Map("groupLabel", "Gastric conduit", "states", [
         Map("label", "Gastric conduit", "phrase", "in the gastric conduit")
     ]),
     Map("groupLabel", "Stomach (tip and side port)", "states", [
-        Map("label", "Stomach (tip and side port)", "phrase", "__STOMACH_GEN__"),
-        Map("label", "Proximal stomach", "phrase", "__STOMACH_PROX__"),
-        Map("label", "Mid stomach", "phrase", "__STOMACH_MID__"),
-        Map("label", "Distal stomach", "phrase", "__STOMACH_DIST__")
+        Map("label", "Stomach (tip and side port)", "short", "(unspecified)", "phrase", "__STOMACH_GEN__"),
+        Map("label", "Proximal stomach", "short", "Proximal", "phrase", "__STOMACH_PROX__"),
+        Map("label", "Mid stomach", "short", "Mid", "phrase", "__STOMACH_MID__"),
+        Map("label", "Distal stomach", "short", "Distal", "phrase", "__STOMACH_DIST__")
     ]),
     Map("groupLabel", "Off-image below diaphragm", "states", [
         Map("label", "Off-image below diaphragm", "phrase", "__OFFIMAGE__")
     ]),
     Map("groupLabel", "Malpositioned bronchus", "states", [
-        Map("label", "Right lower lobe bronchus", "phrase", "__MALPOS_R__"),
-        Map("label", "Left lower lobe bronchus", "phrase", "__MALPOS_L__")
+        Map("label", "Right lower lobe bronchus", "short", "Right", "phrase", "__MALPOS_R__"),
+        Map("label", "Left lower lobe bronchus", "short", "Left", "phrase", "__MALPOS_L__")
     ]),
     Map("groupLabel", "Other", "states", [
         Map("label", "Other", "phrase", "__OTHER__")
@@ -193,44 +268,44 @@ LT_EntericTipGroups := [
 
 LT_FeedingTipGroups := [
     Map("groupLabel", "Esophagus", "states", [
-        Map("label", "Esophagus (unspecified)", "phrase", "in the esophagus"),
-        Map("label", "Upper esophagus", "phrase", "in the upper esophagus"),
-        Map("label", "Mid esophagus", "phrase", "in the mid esophagus"),
-        Map("label", "Distal esophagus", "phrase", "in the distal esophagus")
+        Map("label", "Esophagus (unspecified)", "short", "(unspecified)", "phrase", "in the esophagus"),
+        Map("label", "Upper esophagus", "short", "Upper", "phrase", "in the upper esophagus"),
+        Map("label", "Mid esophagus", "short", "Mid", "phrase", "in the mid esophagus"),
+        Map("label", "Distal esophagus", "short", "Distal", "phrase", "in the distal esophagus")
     ]),
     Map("groupLabel", "Esophagogastric junction", "states", [
-        Map("label", "Near esophagogastric junction", "phrase", "near the esophagogastric junction"),
-        Map("label", "Above esophagogastric junction", "phrase", "above the esophagogastric junction"),
-        Map("label", "Below esophagogastric junction", "phrase", "below the esophagogastric junction")
+        Map("label", "Near esophagogastric junction", "short", "Near", "phrase", "near the esophagogastric junction"),
+        Map("label", "Above esophagogastric junction", "short", "Above", "phrase", "above the esophagogastric junction"),
+        Map("label", "Below esophagogastric junction", "short", "Below", "phrase", "below the esophagogastric junction")
     ]),
     Map("groupLabel", "Gastric conduit", "states", [
         Map("label", "Gastric conduit", "phrase", "in the gastric conduit")
     ]),
     Map("groupLabel", "Stomach (tip and side port)", "states", [
-        Map("label", "Stomach (tip and side port)", "phrase", "__STOMACH_GEN__"),
-        Map("label", "Proximal stomach", "phrase", "__STOMACH_PROX__"),
-        Map("label", "Mid stomach", "phrase", "__STOMACH_MID__"),
-        Map("label", "Distal stomach", "phrase", "__STOMACH_DIST__")
+        Map("label", "Stomach (tip and side port)", "short", "(unspecified)", "phrase", "__STOMACH_GEN__"),
+        Map("label", "Proximal stomach", "short", "Proximal", "phrase", "__STOMACH_PROX__"),
+        Map("label", "Mid stomach", "short", "Mid", "phrase", "__STOMACH_MID__"),
+        Map("label", "Distal stomach", "short", "Distal", "phrase", "__STOMACH_DIST__")
     ]),
     Map("groupLabel", "Duodenum", "states", [
-        Map("label", "Duodenum (unspecified)", "phrase", "in the duodenum"),
-        Map("label", "Proximal duodenum", "phrase", "in the proximal duodenum"),
-        Map("label", "Mid duodenum", "phrase", "in the mid duodenum"),
-        Map("label", "Distal duodenum", "phrase", "in the distal duodenum")
+        Map("label", "Duodenum (unspecified)", "short", "(unspecified)", "phrase", "in the duodenum"),
+        Map("label", "Proximal duodenum", "short", "Proximal", "phrase", "in the proximal duodenum"),
+        Map("label", "Mid duodenum", "short", "Mid", "phrase", "in the mid duodenum"),
+        Map("label", "Distal duodenum", "short", "Distal", "phrase", "in the distal duodenum")
     ]),
     Map("groupLabel", "Near the pylorus", "states", [
-        Map("label", "Near the pylorus", "phrase", "near the pylorus")
+        Map("label", "Near the pylorus", "short", "Near", "phrase", "near the pylorus")
     ]),
     Map("groupLabel", "Duodenojejunal junction", "states", [
-        Map("label", "At duodenojejunal junction", "phrase", "at the duodenojejunal junction"),
-        Map("label", "Beyond duodenojejunal junction", "phrase", "beyond the duodenojejunal junction")
+        Map("label", "At duodenojejunal junction", "short", "At", "phrase", "at the duodenojejunal junction"),
+        Map("label", "Beyond duodenojejunal junction", "short", "Beyond", "phrase", "beyond the duodenojejunal junction")
     ]),
     Map("groupLabel", "Off-image below diaphragm", "states", [
         Map("label", "Off-image below diaphragm", "phrase", "__OFFIMAGE__")
     ]),
     Map("groupLabel", "Malpositioned bronchus", "states", [
-        Map("label", "Right lower lobe bronchus", "phrase", "__MALPOS_R__"),
-        Map("label", "Left lower lobe bronchus", "phrase", "__MALPOS_L__")
+        Map("label", "Right lower lobe bronchus", "short", "Right", "phrase", "__MALPOS_R__"),
+        Map("label", "Left lower lobe bronchus", "short", "Left", "phrase", "__MALPOS_L__")
     ]),
     Map("groupLabel", "Other", "states", [
         Map("label", "Other", "phrase", "__OTHER__")
@@ -239,15 +314,15 @@ LT_FeedingTipGroups := [
 
 LT_EpiduralGroups := [
     Map("groupLabel", "Thoracic spine", "states", [
-        Map("label", "Thoracic spine (unspecified)", "phrase", "over the thoracic spine"),
-        Map("label", "Upper thoracic spine", "phrase", "over the upper thoracic spine"),
-        Map("label", "Mid thoracic spine", "phrase", "over the mid thoracic spine"),
-        Map("label", "Lower thoracic spine", "phrase", "over the lower thoracic spine")
+        Map("label", "Thoracic spine (unspecified)", "short", "(unspecified)", "phrase", "over the thoracic spine"),
+        Map("label", "Upper thoracic spine", "short", "Upper", "phrase", "over the upper thoracic spine"),
+        Map("label", "Mid thoracic spine", "short", "Mid", "phrase", "over the mid thoracic spine"),
+        Map("label", "Lower thoracic spine", "short", "Lower", "phrase", "over the lower thoracic spine")
     ]),
     Map("groupLabel", "Lumbar spine", "states", [
-        Map("label", "Lumbar spine (unspecified)", "phrase", "over the lumbar spine"),
-        Map("label", "Upper lumbar spine", "phrase", "over the upper lumbar spine"),
-        Map("label", "Mid lumbar spine", "phrase", "over the mid lumbar spine")
+        Map("label", "Lumbar spine (unspecified)", "short", "(unspecified)", "phrase", "over the lumbar spine"),
+        Map("label", "Upper lumbar spine", "short", "Upper", "phrase", "over the upper lumbar spine"),
+        Map("label", "Mid lumbar spine", "short", "Mid", "phrase", "over the mid lumbar spine")
     ])
 ]
 
@@ -288,7 +363,7 @@ Show_LinesAndTubes(*) {
 ; ============================================================================
 
 LT_BuildDeviceDefs() {
-    global LT_CentralTipGroups, LT_EntericTipGroups, LT_FeedingTipGroups, LT_EpiduralGroups
+    global LT_CentralTipGroups, LT_ProjectingTipGroups, LT_EntericTipGroups, LT_FeedingTipGroups, LT_EpiduralGroups
 
     defs := Map()
 
@@ -303,7 +378,7 @@ LT_BuildDeviceDefs() {
                 "showIf", Map("field", "form", "value", "Mainstem bronchus"))
         ],
         "sentenceFn", LT_Sentence_ETT,
-        "removalNoun", (fields) => "endotracheal tube"
+        "removalNoun", (fields) => Map("text", "endotracheal tube", "plural", false)
     )
 
     defs["ENTERIC"] := Map(
@@ -313,7 +388,7 @@ LT_BuildDeviceDefs() {
                 "groups", LT_EntericTipGroups)
         ],
         "sentenceFn", (fields) => LT_Sentence_Enteric(fields, "Enteric tube"),
-        "removalNoun", (fields) => "enteric tube"
+        "removalNoun", (fields) => Map("text", "enteric tube", "plural", false)
     )
 
     defs["FEEDING"] := Map(
@@ -325,7 +400,7 @@ LT_BuildDeviceDefs() {
             Map("id", "stylet", "type", "toggle", "label", "With stylet")
         ],
         "sentenceFn", LT_Sentence_Feeding,
-        "removalNoun", (fields) => fields.Get("weighted", false) ? "weighted feeding tube" : "feeding tube"
+        "removalNoun", (fields) => Map("text", fields.Get("weighted", false) ? "weighted feeding tube" : "feeding tube", "plural", false)
     )
 
     defs["IJ"] := Map(
@@ -342,7 +417,7 @@ LT_BuildDeviceDefs() {
             Map("id", "modSheathed", "type", "toggle", "label", "Sheathed"),
             Map("id", "sheathOnly", "type", "toggle", "label", "Sheath only (empty)"),
             Map("id", "tip", "type", "grouped", "label", "Tip location",
-                "groups", LT_CentralTipGroups)
+                "groups", LT_ProjectingTipGroups)
         ],
         "sentenceFn", (fields) => LT_Sentence_CentralLine(fields, "internal jugular catheter"),
         "removalNoun", (fields) => LT_RemovalNoun_CentralLine(fields, "internal jugular catheter")
@@ -362,7 +437,7 @@ LT_BuildDeviceDefs() {
             Map("id", "modSheathed", "type", "toggle", "label", "Sheathed"),
             Map("id", "sheathOnly", "type", "toggle", "label", "Sheath only (empty)"),
             Map("id", "tip", "type", "grouped", "label", "Tip location",
-                "groups", LT_BuildSubclavianTipGroups())
+                "groups", LT_BuildProjectingSubclavianGroups())
         ],
         "sentenceFn", (fields) => LT_Sentence_CentralLine(fields, "subclavian vein catheter"),
         "removalNoun", (fields) => LT_RemovalNoun_CentralLine(fields, "subclavian vein catheter")
@@ -377,8 +452,8 @@ LT_BuildDeviceDefs() {
             Map("id", "tip", "type", "grouped", "label", "Tip location",
                 "groups", LT_BuildSubclavianTipGroups())
         ],
-        "sentenceFn", (fields) => LT_Sentence_CentralLine(fields, "peripherally inserted central catheter"),
-        "removalNoun", (fields) => LT_RemovalNoun_CentralLine(fields, "peripherally inserted central catheter")
+        "sentenceFn", (fields) => LT_Sentence_CentralLine(fields, "peripherally inserted central catheter (PICC)"),
+        "removalNoun", (fields) => LT_RemovalNoun_CentralLine(fields, "peripherally inserted central catheter (PICC)")
     )
 
     defs["PORT"] := Map(
@@ -399,6 +474,34 @@ LT_BuildDeviceDefs() {
         "removalNoun", LT_RemovalNoun_Port
     )
 
+    defs["VECMO"] := Map(
+        "label", "Venous extracorporeal membrane oxygenation (ECMO) cannula",
+        "shortLabel", "vECMO",
+        "fields", [
+            Map("id", "approach", "type", "buttons", "label", "Approach",
+                "options", ["Superior", "Inferior"]),
+            Map("id", "tip", "type", "radio", "label", "Tip location",
+                "options", [
+                    Map("label", "Infrahepatic IVC", "phrase", "in the infrahepatic inferior vena cava"),
+                    Map("label", "Hepatic IVC", "phrase", "in the hepatic inferior vena cava"),
+                    Map("label", "Inferior cavoatrial junction", "short", "Inferior", "phrase", "at the inferior cavoatrial junction"),
+                    Map("label", "Right atrium", "short", "Right", "phrase", "in the right atrium"),
+                    Map("label", "Superior cavoatrial junction", "short", "Superior", "phrase", "at the superior cavoatrial junction"),
+                    Map("label", "SVC", "phrase", "in the superior vena cava")
+                ])
+        ],
+        "sentenceFn", LT_Sentence_VECMO,
+        "removalNoun", LT_RemovalNoun_VECMO
+    )
+
+    defs["IABP"] := Map(
+        "label", "Intra-aortic balloon pump",
+        "shortLabel", "IABP",
+        "fields", [],
+        "sentenceFn", (fields) => "Intra-aortic balloon pump, tip _____ below the left subclavian artery.",
+        "removalNoun", (fields) => Map("text", "intra-aortic balloon pump", "plural", false)
+    )
+
     defs["TRACH"] := Map(
         "label", "Tracheostomy tube",
         "fields", [
@@ -406,7 +509,7 @@ LT_BuildDeviceDefs() {
                 "options", ["At thoracic inlet", "Above carina"])
         ],
         "sentenceFn", LT_Sentence_Trach,
-        "removalNoun", (fields) => "tracheostomy tube"
+        "removalNoun", (fields) => Map("text", "tracheostomy tube", "plural", false)
     )
 
     defs["PLEURAL"] := Map(
@@ -415,9 +518,10 @@ LT_BuildDeviceDefs() {
             Map("id", "laterality", "type", "buttons", "label", "Side",
                 "options", ["Right", "Left"]),
             Map("id", "deviceType", "type", "buttons", "label", "Type",
-                "options", ["Chest tube", "Pleural catheter"]),
+                "options", ["Chest tube", "Pleural catheter", "Pleural pigtail"]),
             Map("id", "location", "type", "buttons", "label", "Location",
-                "options", ["Apical pleural", "Basal pleural", "Mid pleural", "In the chest wall"])
+                "options", ["Apical", "Basal", "Mid", "Chest wall"]),
+            Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
         ],
         "sentenceFn", LT_Sentence_Pleural,
         "removalNoun", LT_RemovalNoun_Pleural
@@ -428,10 +532,11 @@ LT_BuildDeviceDefs() {
         "fields", [
             Map("id", "inferiorApproach", "type", "toggle", "label", "Inferior approach"),
             Map("id", "position", "type", "buttons", "label", "Position",
-                "options", ["Anterior", "Posterior"])
+                "options", ["Anterior", "Posterior"]),
+            Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
         ],
         "sentenceFn", LT_Sentence_Mediastinal,
-        "removalNoun", (fields) => "mediastinal drain"
+        "removalNoun", LT_RemovalNoun_Mediastinal
     )
 
     defs["EPIDURAL"] := Map(
@@ -441,7 +546,7 @@ LT_BuildDeviceDefs() {
                 "groups", LT_EpiduralGroups)
         ],
         "sentenceFn", LT_Sentence_Epidural,
-        "removalNoun", (fields) => "epidural catheter"
+        "removalNoun", (fields) => Map("text", "epidural catheter", "plural", false)
     )
 
     defs["EPIWIRE"] := Map(
@@ -451,11 +556,11 @@ LT_BuildDeviceDefs() {
             Map("id", "retained", "type", "toggle", "label", "Retained")
         ],
         "sentenceFn", (fields) => (fields.Get("retained", false)
-            ? "Retained epicardial pacing wires are present."
-            : "Epicardial pacing wires are present."),
-        "removalNoun", (fields) => (fields.Get("retained", false)
+            ? "Retained epicardial pacing wires."
+            : "Epicardial pacing wires."),
+        "removalNoun", (fields) => Map("text", fields.Get("retained", false)
             ? "retained epicardial pacing wires"
-            : "epicardial pacing wires")
+            : "epicardial pacing wires", "plural", true)
     )
 
     defs["IMPELLA"] := Map(
@@ -467,7 +572,7 @@ LT_BuildDeviceDefs() {
             Map("id", "crossingValve", "type", "toggle", "label", "Crossing the aortic valve plane")
         ],
         "sentenceFn", LT_Sentence_Impella,
-        "removalNoun", (fields) => "Impella left ventricular assist device"
+        "removalNoun", (fields) => Map("text", "Impella left ventricular assist device", "plural", false)
     )
 
     defs["LVAD"] := Map(
@@ -478,15 +583,30 @@ LT_BuildDeviceDefs() {
                 "options", ["HeartMate 3", "HVAD"])
         ],
         "sentenceFn", LT_Sentence_LVAD,
-        "removalNoun", (fields) => "left ventricular assist device"
+        "removalNoun", (fields) => Map("text", "left ventricular assist device", "plural", false)
     )
 
     defs["PADS"] := Map(
         "label", "External pacing/defibrillation pads",
         "shortLabel", "ACD pads",
         "fields", [],
-        "sentenceFn", (fields) => "External pacing/defibrillation pads are present.",
-        "removalNoun", (fields) => "external pacing/defibrillation pads"
+        "sentenceFn", (fields) => "External pacing/defibrillation pads.",
+        "removalNoun", (fields) => Map("text", "external pacing/defibrillation pads", "plural", true)
+    )
+
+    defs["LOOPZIO"] := Map(
+        "label", "Superficial cardiac monitor",
+        "shortLabel", "Loop/Zio",
+        "fields", [],
+        "sentenceFn", (fields) => "Superficial cardiac monitor.",
+        "removalNoun", (fields) => Map("text", "superficial cardiac monitor", "plural", false)
+    )
+
+    defs["LEADLESS"] := Map(
+        "label", "Leadless pacemaker",
+        "fields", [],
+        "sentenceFn", (fields) => "Leadless pacemaker over the right ventricle.",
+        "removalNoun", (fields) => Map("text", "leadless pacemaker", "plural", false)
     )
 
     defs["GENERATOR"] := Map(
@@ -522,7 +642,38 @@ LT_BuildDeviceDefs() {
             Map("id", "locPS", "type", "toggle", "label", "Presternal")
         ],
         "sentenceFn", LT_Sentence_RetainedLeads,
-        "removalNoun", (fields) => "retained pacing/defibrillation leads"
+        "removalNoun", (fields) => Map("text", "retained pacing/defibrillation leads", "plural", true)
+    )
+
+    defs["ABDOMINAL"] := Map(
+        "label", "Abdominal drain",
+        "fields", [
+            Map("id", "location", "type", "buttons", "label", "Location",
+                "options", ["Left upper quadrant", "Epigastric", "Right upper quadrant", "Subhepatic"]),
+            Map("id", "deviceType", "type", "buttons", "label", "Type",
+                "options", ["Pigtail catheter", "Drain"]),
+            Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
+        ],
+        "sentenceFn", LT_Sentence_Abdominal,
+        "removalNoun", LT_RemovalNoun_Abdominal
+    )
+
+    defs["NEPHROSTOMY"] := Map(
+        "label", "Percutaneous nephrostomy catheter",
+        "shortLabel", "Nephrostomy",
+        "fields", [
+            Map("id", "laterality", "type", "buttons", "label", "Side",
+                "options", ["Left", "Right", "Bilateral"])
+        ],
+        "sentenceFn", LT_Sentence_Nephrostomy,
+        "removalNoun", LT_RemovalNoun_Nephrostomy
+    )
+
+    defs["OTHER"] := Map(
+        "label", "Other",
+        "fields", [],
+        "sentenceFn", (fields) => "_____",
+        "removalNoun", (fields) => Map("text", "_____", "plural", false)
     )
 
     return defs
@@ -537,8 +688,27 @@ LT_BuildSubclavianTipGroups() {
         arr.Push(grp)
     }
     arr.Push(Map("groupLabel", "Clavicle", "states", [
-        Map("label", "Right clavicle", "phrase", "projecting over the right clavicle"),
-        Map("label", "Left clavicle", "phrase", "projecting over the left clavicle")
+        Map("label", "Right clavicle", "short", "Right", "phrase", "projecting over the right clavicle"),
+        Map("label", "Left clavicle", "short", "Left", "phrase", "projecting over the left clavicle")
+    ]))
+    arr.Push(Map("groupLabel", "Other", "states", [
+        Map("label", "Other", "phrase", "__OTHER__")
+    ]))
+    return arr
+}
+
+; Same idea, but built on the "projecting over" phrasing set -- used by SCV.
+LT_BuildProjectingSubclavianGroups() {
+    global LT_ProjectingTipGroups
+    arr := []
+    for grp in LT_ProjectingTipGroups {
+        if (grp["groupLabel"] = "Other")
+            continue
+        arr.Push(grp)
+    }
+    arr.Push(Map("groupLabel", "Clavicle", "states", [
+        Map("label", "Right clavicle", "short", "Right", "phrase", "projecting over the right clavicle"),
+        Map("label", "Left clavicle", "short", "Left", "phrase", "projecting over the left clavicle")
     ]))
     arr.Push(Map("groupLabel", "Other", "states", [
         Map("label", "Other", "phrase", "__OTHER__")
@@ -688,7 +858,7 @@ LT_RemovalNoun_CentralLine(fields, nounBase) {
     sheathOnly := fields.Get("sheathOnly", false)
     sideText := (side != "") ? StrLower(side) " " : ""
     noun := sheathOnly ? (nounBase " sheath") : nounBase
-    return sideText noun
+    return Map("text", sideText noun, "plural", false)
 }
 
 LT_Sentence_ETT(fields) {
@@ -755,31 +925,47 @@ LT_Sentence_Pleural(fields) {
     side := fields.Get("laterality", "")
     location := fields.Get("location", "")
     deviceType := fields.Get("deviceType", "")
+    count := fields.Get("count", 1)
 
     sideText := (side != "") ? StrLower(side) " " : ""
+    locText := (location != "") ? StrLower(location) " " : ""
     typeNoun := (deviceType != "") ? StrLower(deviceType) : "chest tube"
-    subject := LT_Capitalize(sideText typeNoun)
+    if (count > 1)
+        typeNoun .= "s"
 
-    if (location = "Apical pleural")
-        locPhrase := "in the apical pleural space"
-    else if (location = "Basal pleural")
-        locPhrase := "in the basal pleural space"
-    else if (location = "Mid pleural")
-        locPhrase := "in the mid pleural space"
-    else if (location = "In the chest wall")
-        locPhrase := "within the chest wall"
-    else
-        locPhrase := "_____"
-
-    return subject " tip is " locPhrase "."
+    base := LT_Capitalize(sideText locText typeNoun)
+    if (count > 1)
+        base .= " [" count "]"
+    base .= "."
+    return base
 }
 
 LT_RemovalNoun_Pleural(fields) {
     side := fields.Get("laterality", "")
     deviceType := fields.Get("deviceType", "")
+    count := fields.Get("count", 1)
     sideText := (side != "") ? StrLower(side) " " : ""
     typeNoun := (deviceType != "") ? StrLower(deviceType) : "chest tube"
-    return sideText typeNoun
+    if (count > 1)
+        typeNoun .= "s"
+    return Map("text", sideText typeNoun, "plural", count > 1)
+}
+
+LT_Sentence_VECMO(fields) {
+    approach := fields.Get("approach", "")
+    tipPhrase := fields.Get("tip_phrase", "")
+    if (tipPhrase = "")
+        tipPhrase := "_____"
+
+    approachText := (approach != "") ? StrLower(approach) " approach " : ""
+    base := approachText "venous extracorporeal membrane oxygenation (ECMO) cannula"
+    return LT_Capitalize(base) ", tip " tipPhrase "."
+}
+
+LT_RemovalNoun_VECMO(fields) {
+    approach := fields.Get("approach", "")
+    approachText := (approach != "") ? StrLower(approach) " approach " : ""
+    return Map("text", approachText "venous extracorporeal membrane oxygenation (ECMO) cannula", "plural", false)
 }
 
 LT_Sentence_Port(fields) {
@@ -823,7 +1009,7 @@ LT_RemovalNoun_Port(fields) {
     out := ""
     for i, p in parts
         out .= (i > 1 ? " " : "") p
-    return out
+    return Map("text", out, "plural", false)
 }
 
 LT_Sentence_Impella(fields) {
@@ -848,6 +1034,7 @@ LT_Sentence_Epidural(fields) {
 LT_Sentence_Mediastinal(fields) {
     inferior := fields.Get("inferiorApproach", false)
     position := fields.Get("position", "")
+    count := fields.Get("count", 1)
 
     parts := []
     if (inferior)
@@ -859,11 +1046,25 @@ LT_Sentence_Mediastinal(fields) {
     for i, p in parts
         desc .= (i > 1 ? ", " : "") p
 
-    base := "Mediastinal drain is present"
+    noun := "mediastinal drain"
+    if (count > 1)
+        noun .= "s"
+
+    base := LT_Capitalize(noun)
+    if (count > 1)
+        base .= " [" count "]"
     if (desc != "")
         base .= " (" desc ")"
     base .= "."
     return base
+}
+
+LT_RemovalNoun_Mediastinal(fields) {
+    count := fields.Get("count", 1)
+    noun := "mediastinal drain"
+    if (count > 1)
+        noun .= "s"
+    return Map("text", noun, "plural", count > 1)
 }
 
 LT_GeneratorLeadLocations(fields) {
@@ -914,7 +1115,55 @@ LT_RemovalNoun_Generator(fields) {
     position := fields.Get("position", "")
     sideText := (side != "") ? StrLower(side) " " : ""
     posText := (position != "") ? StrLower(position) " " : ""
-    return sideText posText "chest wall generator"
+    return Map("text", sideText posText "chest wall generator", "plural", false)
+}
+
+LT_Sentence_Abdominal(fields) {
+    location := fields.Get("location", "")
+    deviceType := fields.Get("deviceType", "")
+    count := fields.Get("count", 1)
+
+    locText := (location != "") ? StrLower(location) " " : ""
+    typeNoun := (deviceType != "") ? StrLower(deviceType) : "drain"
+    if (count > 1)
+        typeNoun .= "s"
+
+    base := LT_Capitalize(locText typeNoun)
+    if (count > 1)
+        base .= " [" count "]"
+    base .= "."
+    return base
+}
+
+LT_RemovalNoun_Abdominal(fields) {
+    location := fields.Get("location", "")
+    deviceType := fields.Get("deviceType", "")
+    count := fields.Get("count", 1)
+    locText := (location != "") ? StrLower(location) " " : ""
+    typeNoun := (deviceType != "") ? StrLower(deviceType) : "drain"
+    if (count > 1)
+        typeNoun .= "s"
+    return Map("text", locText typeNoun, "plural", count > 1)
+}
+
+LT_Sentence_Nephrostomy(fields) {
+    side := fields.Get("laterality", "")
+    isPlural := (side = "Bilateral")
+    sideText := (side != "") ? StrLower(side) " " : ""
+    noun := "percutaneous nephrostomy tube"
+    if (isPlural)
+        noun .= "s"
+    return LT_Capitalize(sideText noun) "."
+}
+
+LT_RemovalNoun_Nephrostomy(fields) {
+    side := fields.Get("laterality", "")
+    isPlural := (side = "Bilateral")
+    sideText := (side != "") ? StrLower(side) " " : ""
+    noun := "percutaneous nephrostomy tube"
+    if (isPlural)
+        noun .= "s"
+    return Map("text", sideText noun, "plural", isPlural)
 }
 
 LT_Sentence_RetainedLeads(fields) {
@@ -933,21 +1182,21 @@ LT_Sentence_LVAD(fields) {
     return model " left ventricular assist device is present."
 }
 
+; Each entry is Map("text", "...", "plural", true/false) -- plural reflects
+; the noun's own grammatical number (e.g. "pads" is always plural, a
+; multi-count chest tube entry is plural when count > 1), independent of
+; how many devices are being grouped together.
 LT_JoinRemovalSentence(nouns) {
     n := nouns.Length
-    if (n = 1) {
-        joined := nouns[1]
-        verb := "is"
-    } else {
-        joined := ""
-        Loop n - 1 {
-            joined .= nouns[A_Index]
-            if (A_Index < n - 1)
-                joined .= ", "
-        }
-        joined .= (n > 2 ? "," : "") " and " nouns[n]
-        verb := "are"
+    texts := []
+    anyPlural := false
+    for item in nouns {
+        texts.Push(item["text"])
+        if (item["plural"])
+            anyPlural := true
     }
+    joined := LT_JoinWithAnd(texts)
+    verb := (n > 1 || anyPlural) ? "are" : "is"
     return "Prior " joined " " verb " now absent."
 }
 
@@ -1114,6 +1363,28 @@ LT_FieldToggle(instId, fieldId, *) {
         LT_UpdateOutputBoxOnly()
 }
 
+LT_CounterAdjust(instId, fieldId, delta, minV, maxV, *) {
+    global LT_Instances, LT_FieldControls
+    inst := LT_Instances[instId]
+    fields := inst["fields"]
+    cur := fields.Get(fieldId, 1)
+    newVal := cur + delta
+    if (newVal < minV)
+        newVal := minV
+    if (newVal > maxV)
+        newVal := maxV
+    fields[fieldId] := newVal
+
+    key := instId "|" fieldId
+    if (LT_FieldControls.Has(key)) {
+        for entry in LT_FieldControls[key] {
+            if (entry["meta"]["kind"] = "counterDisplay")
+                try entry["ctrl"].Text := String(newVal)
+        }
+    }
+    LT_UpdateOutputBoxOnly()
+}
+
 LT_RadioSet(instId, fieldId, optLabel, optPhrase, *) {
     global LT_Instances, LT_DeviceDefs
     inst := LT_Instances[instId]
@@ -1205,12 +1476,15 @@ LT_CopyOutput(*) {
 }
 
 LT_AddDeviceFromListbox(*) {
-    global LT_GuiObj, LT_DeviceOrder
+    global LT_GuiObj, LT_PickListDeviceKeys
     lb := LT_GuiObj["LT_DeviceListBox"]
     idx := lb.Value
     if (idx = 0)
         return
-    LT_AddInstance(LT_DeviceOrder[idx])
+    key := (idx >= 1 && idx <= LT_PickListDeviceKeys.Length) ? LT_PickListDeviceKeys[idx] : ""
+    if (key = "")
+        return  ; a category header row, not a real device
+    LT_AddInstance(key)
 }
 
 
@@ -1283,12 +1557,21 @@ LT_OpenInstanceFromOutput(instId, *) {
     LT_RebuildMiddleColumn(instId)
 }
 
+; Builds the picker's display list with a header row before each category
+; and tracks, per row, which device key (if any) it corresponds to -- see
+; LT_PickListDeviceKeys, used by LT_AddDeviceFromListbox to skip headers.
 LT_DeviceLabelList() {
-    global LT_DeviceOrder, LT_DeviceDefs
+    global LT_DeviceCategories, LT_DeviceDefs, LT_PickListDeviceKeys
     labels := []
-    for key in LT_DeviceOrder {
-        def := LT_DeviceDefs[key]
-        labels.Push(def.Get("shortLabel", def["label"]))
+    LT_PickListDeviceKeys := []
+    for cat in LT_DeviceCategories {
+        labels.Push("── " cat["name"] " ──")
+        LT_PickListDeviceKeys.Push("")
+        for key in cat["keys"] {
+            def := LT_DeviceDefs[key]
+            labels.Push(def.Get("shortLabel", def["label"]))
+            LT_PickListDeviceKeys.Push(key)
+        }
     }
     return labels
 }
@@ -1513,8 +1796,9 @@ LT_RefreshFieldControls(instId, fieldId, fieldDef, fields) {
                 try ctrl.Text := (isActive ? "> " : "") famLabel
             } else if (kind = "state") {
                 lbl := entry["meta"]["label"]
+                short := entry["meta"].Get("short", lbl)
                 selected := (curVal = lbl)
-                try ctrl.Text := (selected ? "v " : "") lbl
+                try ctrl.Text := (selected ? "v " : "") short
             }
 
         } else if (type = "buttons" || type = "radio") {
@@ -1619,15 +1903,16 @@ LT_RenderField(g, x, y, w, instId, fieldDef, fields) {
                 sbx := subX
                 for st in grp["states"] {
                     stSelected := (st["label"] = curVal)
-                    sBtnW := LT_TextButtonWidth("v " st["label"])
+                    stShort := st.Get("short", st["label"])
+                    sBtnW := LT_TextButtonWidth("v " stShort)
                     if (sbx + sBtnW > subX + subW) {
                         sbx := subX
                         y += 22
                     }
-                    sbtn := LT_AddMid(g, "Button", "x" sbx " y" y " w" sBtnW " h20", (stSelected ? "v " : "") st["label"])
+                    sbtn := LT_AddMid(g, "Button", "x" sbx " y" y " w" sBtnW " h20", (stSelected ? "v " : "") stShort)
                     sbtn.SetFont("s8")
                     sbtn.OnEvent("Click", LT_GroupStateClick.Bind(instId, id, st["label"], st["phrase"]))
-                    LT_RegisterFieldControl(instId, id, sbtn, Map("kind", "state", "label", st["label"]))
+                    LT_RegisterFieldControl(instId, id, sbtn, Map("kind", "state", "label", st["label"], "short", stShort))
                     sbx += sBtnW + 4
                 }
                 y += 24
@@ -1653,6 +1938,22 @@ LT_RenderField(g, x, y, w, instId, fieldDef, fields) {
         cb.Value := fields.Get(id, false) ? 1 : 0
         cb.OnEvent("Click", LT_FieldToggle.Bind(instId, id))
         return y + 26
+
+    } else if (type = "counter") {
+        minV := fieldDef.Get("min", 1)
+        maxV := fieldDef.Get("max", 9)
+        curCount := fields.Get(id, 1)
+
+        LT_AddMid(g, "Text", "x" x " y" (y + 3) " w90", fieldDef["label"] ":")
+        minusBtn := LT_AddMid(g, "Button", "x" (x + 95) " y" y " w24 h22", "-")
+        minusBtn.OnEvent("Click", LT_CounterAdjust.Bind(instId, id, -1, minV, maxV))
+
+        countText := LT_AddMid(g, "Text", "x" (x + 123) " y" (y + 3) " w28 Center", String(curCount))
+        LT_RegisterFieldControl(instId, id, countText, Map("kind", "counterDisplay"))
+
+        plusBtn := LT_AddMid(g, "Button", "x" (x + 155) " y" y " w24 h22", "+")
+        plusBtn.OnEvent("Click", LT_CounterAdjust.Bind(instId, id, 1, minV, maxV))
+        return y + 28
     }
 
     return y
