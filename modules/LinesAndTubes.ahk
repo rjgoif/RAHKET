@@ -575,13 +575,15 @@ LT_BuildDeviceDefs() {
             Map("id", "laterality", "type", "buttons", "label", "Side",
                 "options", ["Right", "Left"]),
             Map("id", "deviceType", "type", "buttons", "label", "Type",
-                "options", ["Chest tube", "Pleural catheter", "Pleural pigtail"]),
+                "options", ["Chest tube", "Pleural catheter", "Pigtail catheter"]),
             Map("id", "location", "type", "buttons", "label", "Location",
                 "options", ["Apical", "Basal", "Mid", "Chest wall", "Other"]),
             Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
         ],
         "sentenceFn", LT_Sentence_Pleural,
-        "removalNoun", LT_RemovalNoun_Pleural
+        "removalNoun", LT_RemovalNoun_Pleural,
+        "aggregate", true,
+        "aggregateFn", LT_AggregatePleural
     )
 
     defs["MEDIASTINAL"] := Map(
@@ -593,7 +595,9 @@ LT_BuildDeviceDefs() {
             Map("id", "count", "type", "counter", "label", "Count", "min", 1, "max", 9)
         ],
         "sentenceFn", LT_Sentence_Mediastinal,
-        "removalNoun", LT_RemovalNoun_Mediastinal
+        "removalNoun", LT_RemovalNoun_Mediastinal,
+        "aggregate", true,
+        "aggregateFn", LT_AggregateMediastinal
     )
 
     defs["EPIDURAL"] := Map(
@@ -875,16 +879,19 @@ LT_DeviceHasLateralityField(def) {
     return false
 }
 
-LT_InstanceNeedsSideWarning(instId) {
-    global LT_Instances, LT_DeviceDefs
-    inst := LT_Instances[instId]
-    def := LT_DeviceDefs[inst["deviceKey"]]
-    fields := inst["fields"]
+LT_FieldsNeedSideWarning(fields, def) {
     if (fields.Get("removed", false))
         return false
     if (!LT_DeviceHasLateralityField(def))
         return false
     return (fields.Get("laterality", "") = "")
+}
+
+LT_InstanceNeedsSideWarning(instId) {
+    global LT_Instances, LT_DeviceDefs
+    inst := LT_Instances[instId]
+    def := LT_DeviceDefs[inst["deviceKey"]]
+    return LT_FieldsNeedSideWarning(inst["fields"], def)
 }
 
 LT_AnyInstanceNeedsSideWarning() {
@@ -905,6 +912,12 @@ LT_Capitalize(s) {
     if (s = "")
         return s
     return StrUpper(SubStr(s, 1, 1)) SubStr(s, 2)
+}
+
+LT_LowercaseFirst(s) {
+    if (s = "")
+        return s
+    return StrLower(SubStr(s, 1, 1)) SubStr(s, 2)
 }
 
 ; "A" / "A and B" / "A, B, and C"
@@ -978,10 +991,10 @@ LT_Sentence_ETT(fields) {
     if (form = "Mainstem bronchus") {
         side := fields.Get("side", "")
         sideText := (side != "") ? StrLower(side) : "_____"
-        return "Endotracheal tube tip is in the " sideText " mainstem bronchus."
+        return "Endotracheal tube tip in the " sideText " mainstem bronchus."
     }
 
-    return "Endotracheal tube tip is _____ above the carina."
+    return "Endotracheal tube tip _____ above the carina."
 }
 
 LT_Sentence_Enteric(fields, deviceLabel) {
@@ -991,23 +1004,23 @@ LT_Sentence_Enteric(fields, deviceLabel) {
         return deviceLabel "."
 
     if (loc = "__OTHER__")
-        return deviceLabel " tip is _____."
+        return deviceLabel " tip _____."
     if (loc = "__STOMACH_GEN__")
-        return deviceLabel " tip and side port are in the stomach."
+        return deviceLabel " tip and side port in the stomach."
     if (loc = "__STOMACH_PROX__")
-        return deviceLabel " tip and side port are in the proximal stomach."
+        return deviceLabel " tip and side port in the proximal stomach."
     if (loc = "__STOMACH_MID__")
-        return deviceLabel " tip and side port are in the mid stomach."
+        return deviceLabel " tip and side port in the mid stomach."
     if (loc = "__STOMACH_DIST__")
-        return deviceLabel " tip and side port are in the distal stomach."
+        return deviceLabel " tip and side port in the distal stomach."
     if (loc = "__OFFIMAGE__")
-        return deviceLabel " tip is off-image below the diaphragm."
+        return deviceLabel " tip off-image below the diaphragm."
     if (loc = "__MALPOS_R__")
-        return deviceLabel " tip is malpositioned in the right lower lobe bronchus."
+        return deviceLabel " tip malpositioned in the right lower lobe bronchus."
     if (loc = "__MALPOS_L__")
-        return deviceLabel " tip is malpositioned in the left lower lobe bronchus."
+        return deviceLabel " tip malpositioned in the left lower lobe bronchus."
 
-    return deviceLabel " tip is " loc "."
+    return deviceLabel " tip " loc "."
 }
 
 LT_Sentence_Feeding(fields) {
@@ -1043,9 +1056,9 @@ LT_RemovalNoun_GGJ(fields) {
 LT_Sentence_Trach(fields) {
     form := fields.Get("form", "")
     if (form = "At thoracic inlet")
-        return "Tracheostomy tube tip is at the thoracic inlet."
+        return "Tracheostomy tube tip at the thoracic inlet."
     if (form = "Above carina")
-        return "Tracheostomy tube tip is _____ above the carina."
+        return "Tracheostomy tube tip _____ above the carina."
     return "Tracheostomy tube."
 }
 
@@ -1077,6 +1090,28 @@ LT_RemovalNoun_Pleural(fields) {
     if (count > 1)
         typeNoun .= "s"
     return Map("text", sideText typeNoun, "plural", count > 1)
+}
+
+; Combines every active pleural tube/pigtail/catheter instance onto one
+; shared line, e.g. "Right apical chest tubes [2] and left basal pigtail
+; catheters [3]" instead of one line per instance. Each instance already
+; produces a complete self-contained descriptor via LT_Sentence_Pleural, so
+; this just joins those fragments together (lowercasing every fragment
+; after the first, since only the start of the whole line should be
+; capitalized).
+LT_AggregatePleural(instancesFields) {
+    frags := []
+    for i, f in instancesFields {
+        s := LT_Sentence_Pleural(f)
+        s := LT_AppendOtherNote(s, f)
+        s := LT_StripTrailingPeriod(s)
+        if (i > 1)
+            s := LT_LowercaseFirst(s)
+        frags.Push(s)
+    }
+    if (frags.Length = 0)
+        return ""
+    return LT_JoinWithAnd(frags)
 }
 
 LT_Sentence_VECMO(fields) {
@@ -1156,7 +1191,7 @@ LT_Sentence_Epidural(fields) {
     phrase := fields.Get("tip_phrase", "")
     if (phrase = "" || phrase = "__OTHER__")
         phrase := "_____"
-    return "Epidural catheter tip is " phrase "."
+    return "Epidural catheter tip " phrase "."
 }
 
 LT_Sentence_Mediastinal(fields) {
@@ -1193,6 +1228,74 @@ LT_RemovalNoun_Mediastinal(fields) {
     if (count > 1)
         noun .= "s"
     return Map("text", noun, "plural", count > 1)
+}
+
+; Combines every active mediastinal drain instance into one shared line,
+; e.g. "Anterior [2] and posterior [2] inferior approach mediastinal
+; drains" -- grouped by position, with inferior approach and the info note
+; applied once if any instance has them checked, rather than repeating
+; "mediastinal drain(s)" and the modifiers on a separate line per instance.
+LT_AggregateMediastinal(instancesFields) {
+    groups := Map()
+    order := []
+    anyInferior := false
+    anyOtherNote := false
+
+    for f in instancesFields {
+        pos := f.Get("position", "")
+        cnt := f.Get("count", 1)
+        if (!groups.Has(pos)) {
+            groups[pos] := 0
+            order.Push(pos)
+        }
+        groups[pos] += cnt
+        if (f.Get("inferiorApproach", false))
+            anyInferior := true
+        if (f.Get("otherNote", false))
+            anyOtherNote := true
+    }
+
+    canonical := ["Anterior", "Posterior", ""]
+    keys := []
+    for k in canonical
+        if (groups.Has(k))
+            keys.Push(k)
+    for k in order {
+        found := false
+        for kk in keys {
+            if (kk = k) {
+                found := true
+                break
+            }
+        }
+        if (!found)
+            keys.Push(k)
+    }
+
+    groupTexts := []
+    totalCount := 0
+    for k in keys {
+        c := groups[k]
+        totalCount += c
+        if (k != "") {
+            t := StrLower(k)
+            if (c > 1)
+                t .= " [" c "]"
+            groupTexts.Push(t)
+        } else if (c > 1) {
+            groupTexts.Push("[" c "]")
+        }
+    }
+
+    modifier := anyInferior ? "inferior approach " : ""
+    noun := (totalCount > 1) ? "mediastinal drains" : "mediastinal drain"
+
+    line := LT_Capitalize(modifier noun)
+    if (groupTexts.Length > 0)
+        line .= ": " LT_JoinWithAnd(groupTexts)
+    if (anyOtherNote)
+        line .= " _____"
+    return line
 }
 
 LT_GeneratorLeadLocations(fields) {
@@ -1317,8 +1420,8 @@ LT_Sentence_RetainedLeads(fields) {
 LT_Sentence_LVAD(fields) {
     model := fields.Get("model", "")
     if (model = "")
-        return "Left ventricular assist device is present."
-    return model " left ventricular assist device is present."
+        return "Left ventricular assist device."
+    return model " left ventricular assist device."
 }
 
 ; Each entry is Map("text", "...", "plural", true/false) -- plural reflects
@@ -1366,16 +1469,21 @@ LT_BuildOutput() {
     removalNouns := []
 
     for deviceKey in LT_DeviceOrder {
+        def := LT_DeviceDefs[deviceKey]
+        isAggregate := def.Get("aggregate", false)
+        activeFieldsList := []
+
         for instId in LT_InstanceOrder {
             inst := LT_Instances[instId]
             if (inst["deviceKey"] != deviceKey)
                 continue
-            def := LT_DeviceDefs[deviceKey]
             fields := inst["fields"]
 
             if (fields.Get("removed", false)) {
                 removalFn := def["removalNoun"]
                 removalNouns.Push(removalFn(fields))
+            } else if (isAggregate) {
+                activeFieldsList.Push(fields)
             } else {
                 sentenceFn := def["sentenceFn"]
                 s := sentenceFn(fields)
@@ -1385,6 +1493,13 @@ LT_BuildOutput() {
                     lines.Push(s)
                 }
             }
+        }
+
+        if (isAggregate && activeFieldsList.Length > 0) {
+            aggFn := def["aggregateFn"]
+            s := aggFn(activeFieldsList)
+            if (s != "")
+                lines.Push(LT_StripTrailingPeriod(s))
         }
     }
 
@@ -1680,15 +1795,26 @@ LT_RenderOutputPane() {
     removalNouns := []
 
     for deviceKey in LT_DeviceOrder {
+        def := LT_DeviceDefs[deviceKey]
+        isAggregate := def.Get("aggregate", false)
+        activeFieldsList := []
+        anyNeedsSide := false
+
         for instId in LT_InstanceOrder {
             inst := LT_Instances[instId]
             if (inst["deviceKey"] != deviceKey)
                 continue
-            def := LT_DeviceDefs[deviceKey]
             fields := inst["fields"]
 
             if (fields.Get("removed", false)) {
                 removalNouns.Push(def["removalNoun"](fields))
+                continue
+            }
+
+            if (isAggregate) {
+                activeFieldsList.Push(fields)
+                if (LT_FieldsNeedSideWarning(fields, def))
+                    anyNeedsSide := true
                 continue
             }
 
@@ -1706,6 +1832,20 @@ LT_RenderOutputPane() {
             txt.OnEvent("Click", LT_OpenInstanceFromOutput.Bind(instId))
             LT_RightControls.Push(txt)
             y += h + 8
+        }
+
+        if (isAggregate && activeFieldsList.Length > 0) {
+            aggFn := def["aggregateFn"]
+            s := LT_StripTrailingPeriod(aggFn(activeFieldsList))
+            if (s != "") {
+                approxRows := Ceil(StrLen(s) / 50)
+                h := Max(20, approxRows * 16 + 6)
+                lineColor := anyNeedsSide ? "cRed" : "cBlue"
+                txt := LT_GuiObj.Add("Text", "x" LT_RightX " y" y " w" LT_RightW " h" h " " lineColor, s)
+                txt.OnEvent("Click", LT_OpenDeviceFromOutput.Bind(deviceKey))
+                LT_RightControls.Push(txt)
+                y += h + 8
+            }
         }
     }
 
@@ -1725,6 +1865,21 @@ LT_OpenInstanceFromOutput(instId, *) {
     for id in LT_InstanceOrder
         LT_Instances[id]["collapsed"] := (id != instId)
     LT_RebuildMiddleColumn(instId)
+}
+
+; Clicking an aggregated line (mediastinal drains, chest tubes) expands
+; every instance of that device, since the line represents all of them.
+LT_OpenDeviceFromOutput(deviceKey, *) {
+    global LT_Instances, LT_InstanceOrder
+    firstId := ""
+    for id in LT_InstanceOrder {
+        inst := LT_Instances[id]
+        belongs := (inst["deviceKey"] = deviceKey)
+        inst["collapsed"] := !belongs
+        if (belongs && firstId = "")
+            firstId := id
+    }
+    LT_RebuildMiddleColumn(firstId)
 }
 
 ; Builds the picker's display list with a header row before each category
