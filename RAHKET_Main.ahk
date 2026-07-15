@@ -7,8 +7,8 @@
 #SingleInstance Force
 Persistent
 
-RAHKET_VERSION := "1.00.14"
-;@Ahk2Exe-SetVersion 1.00.14
+RAHKET_VERSION := "1.00.16"
+;@Ahk2Exe-SetVersion 1.00.16
 ;@Ahk2Exe-SetDescription RAHKET - Radiology AutoHotKey Enhancement Tools
 ;@Ahk2Exe-SetProductName RAHKET
 ;@Ahk2Exe-SetCompanyName Reece J. Goiffon MD PhD
@@ -187,6 +187,7 @@ else if FileExist(A_ScriptDir "\assets\RAHKET_rocket_icon.ico")
 ; ============================================================================
 
 #Include Modules\NoduleHunter.ahk
+#Include Modules\LinesAndTubes.ahk
 #Include Modules\ThyroidNodules.ahk
 ;#Include Modules\ThyroidReformatter.ahk
 #Include Modules\VesselMeasurements.ahk
@@ -203,6 +204,7 @@ else if FileExist(A_ScriptDir "\assets\RAHKET_rocket_icon.ico")
 
 A_TrayMenu.Delete()
 A_TrayMenu.Add("Lung Nodule Hunter",   MenuItem_NoduleHunter)
+A_TrayMenu.Add("Lines and Tubes",      MenuItem_LinesAndTubes)
 A_TrayMenu.Add("Thyroid Nodules",      MenuItem_ThyroidNodules)
 ;A_TrayMenu.Add("Thyroid Reformatter", MenuItem_ThyroidReformatter)
 A_TrayMenu.Add("Vessel Measurements",  MenuItem_VesselMeasurements)
@@ -223,6 +225,10 @@ A_TrayMenu.Add("Exit",                 MenuItem_Exit)
 
 MenuItem_NoduleHunter(*) {
     Show_NoduleHunter()
+}
+
+MenuItem_LinesAndTubes(*) {
+    Show_LinesAndTubes()
 }
 
 MenuItem_ThyroidNodules(*) {
