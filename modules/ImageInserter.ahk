@@ -682,10 +682,20 @@ OnColorRejected(guiObj, filteredPath) {
 ImageInserter_HotkeyRouter(*) {
     global ImageInserter_IsActive, ImageInserter_PromptDeclined
 
-    if !ImageInserter_IsActive {
+    activeExe := WinGetProcessName("A")
+    isVisageActive := InStr(activeExe, "vsclient.exe")
+    isPowerScribeActive := WinActive("ahk_exe Nuance.PowerScribeOne.exe") ? true : false
 
-        activeExe := WinGetProcessName("A")
-        isVisageActive := InStr(activeExe, "vsclient.exe")
+    ; Neither Visage nor PowerScribe — always pass the backtick through,
+    ; regardless of whether Image Inserter is enabled or disabled
+    if (!isVisageActive && !isPowerScribeActive) {
+        Hotkey("``", "Off")
+        SendEvent("``")
+        Hotkey("``", "On")
+        return
+    }
+
+    if !ImageInserter_IsActive {
 
         ; Only prompt when Visage is the active window
         if !isVisageActive {
@@ -709,13 +719,12 @@ ImageInserter_HotkeyRouter(*) {
         ImageInserter_Enable()
     }
 
-    if WinActive("ahk_exe Nuance.PowerScribeOne.exe") {
+    if isPowerScribeActive {
         ReformatSeriesImage()
         return
     }
 
-    activeExe := WinGetProcessName("A")
-    if InStr(activeExe, "vsclient.exe") {
+    if isVisageActive {
         if IsNewVisageUI() {
             CaptureSeriesImage_NewUI()
         } else {
@@ -723,11 +732,6 @@ ImageInserter_HotkeyRouter(*) {
         }
         return
     }
-
-	; Neither Visage nor PowerScribe — pass through normally
-	Hotkey("``", "Off")
-	SendEvent("``")
-	Hotkey("``", "On")
 }
 
 
