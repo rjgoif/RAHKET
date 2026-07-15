@@ -19,6 +19,13 @@ GITHUB_RELEASES_URL := "https://github.com/rjgoif/RAHKET/releases/latest"
 
 
 ; ============================================================================
+; GLOBAL HOTKEYS
+; ============================================================================
+
+#`::Show_QuickLauncher()
+
+
+; ============================================================================
 ; ZIP EXTRACT HELPER (uses Windows Shell)
 ; ============================================================================
 
@@ -195,6 +202,7 @@ else if FileExist(A_ScriptDir "\assets\RAHKET_rocket_icon.ico")
 #Include Modules\Links.ahk
 #Include Modules\ImageInserter.ahk
 #Include Modules\PS_TextFormatter.ahk
+#Include Modules\QuickLauncher.ahk
 
 
 
