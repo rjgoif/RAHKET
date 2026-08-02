@@ -1398,7 +1398,10 @@ ReformatPairs(text) {
                     imageList := StrSplit(imagesStr, ",")
                     for imgStr in imageList {
                         img := Trim(imgStr)
-                        if RegExMatch(img, "^\d+$") {
+                        ; Accept a plain image number, or one with a redundant
+                        ; "series:" prefix (e.g. "7:491" inside a "7:..." group)
+                        if RegExMatch(img, "^(?:\d+:)?(\d+)$", &imMatch) {
+                            img := imMatch[1]
                             if !pairs.Has(series)
                                 pairs[series] := []
                             pairs[series].Push(img)
