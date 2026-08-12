@@ -1,0 +1,40 @@
+{
+    "_description": "Config for CT Abdomen and Pelvis party macro conversion. Universal rules (Rules/universal_rules.json) always run first; additionalRules below run after, for exam-specific edits that don't belong everywhere.",
+
+    "name": "CT Abdomen and Pelvis",
+    "modality": "CT",
+
+    "examMatch": {
+        "_note": "Verified 2026-08-12 against a real copied CT Abd/Pelvis header (\"CT ABDOMEN/PELVIS WITH CONTRAST\").",
+        "patterns": [
+            "CT\\s+ABDOMEN\\s*/?\\s*(AND)?\\s*PELVIS"
+        ]
+    },
+
+    "measurementUnit": "cm",
+    "reflowThreshold": 3,
+
+    "templateFile": "CT_Abd_Pelvis.rtf",
+
+    "additionalRules": [],
+
+    "sections": [
+        { "_note": "extract sections pull from a labeled block in the HARM-templated source text",
+          "sourceLabel": "Lower Chest", "outputField": "Chest", "mode": "extract" },
+        { "sourceLabel": "Liver", "outputField": "Liver", "mode": "extract" },
+        { "sourceLabel": "Biliary", "outputField": "Biliary", "mode": "extract" },
+        { "sourceLabel": "Spleen", "outputField": "Spleen", "mode": "extract" },
+        { "sourceLabel": "Pancreas", "outputField": "Pancreas", "mode": "extract" },
+        { "sourceLabel": "Adrenal Glands", "outputField": "Adrenal", "mode": "extract" },
+        { "sourceLabel": "Kidneys/Ureters", "outputField": "Kidneys", "mode": "extract" },
+        { "_note": "keywordScan: no separate 'Stones:' label exists in the HARM source, so this scans the Kidneys section's extracted text for stone-related terms. If found, it's flagged in the diff view for manual review rather than auto-written -- move the text into the Stones field yourself in PowerScribe. If not found, the Stones field keeps the template's own default ('No stones.').",
+          "outputField": "Stones", "mode": "keywordScan", "scanField": "Kidneys",
+          "keywords": ["stone", "calculus", "calculi", "nephrolithiasis", "urolithiasis", "staghorn"] },
+        { "sourceLabel": "Bowel", "outputField": "Bowel", "mode": "extract" },
+        { "sourceLabel": "Peritoneum/Retroperitoneum", "outputField": "Peritoneum", "mode": "extract" },
+        { "sourceLabel": "Lymph Nodes", "outputField": "Lymph Nodes", "mode": "extract" },
+        { "sourceLabel": "Pelvic Organs/Bladder", "outputField": "Pelvic", "mode": "extract" },
+        { "sourceLabel": "Vessels", "outputField": "Vessels", "mode": "extract" },
+        { "sourceLabel": "Bones/Soft Tissues", "outputField": "Bones", "mode": "extract" }
+    ]
+}

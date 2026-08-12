@@ -1,0 +1,215 @@
+{
+    "_description": "Cleanup rules applied to EVERY party macro conversion, regardless of exam type. Add new rules under the category that fits, or start a new category. Order matters within a category and categories run top to bottom.",
+
+    "categories": [
+        {
+            "name": "Spacing and punctuation",
+            "rules": [
+                { "type": "literal", "find": "  ", "replace": " " },
+                { "type": "literal", "find": "..", "replace": "." },
+                { "type": "literal", "find": "field of view", "replace": "field-of-view" }
+            ]
+        },
+        {
+            "name": "Word choice",
+            "rules": [
+                { "type": "literal", "find": "worrisome", "replace": "suspicious" },
+                { "type": "literal", "find": "hernias", "replace": "herniae" },
+                { "type": "literal", "find": "new or enlarging", "replace": "new or increased" },
+                { "type": "literal", "find": "new or increasing", "replace": "new or increased" },
+                { "type": "literal", "find": "new or growing", "replace": "new or increased" },
+                { "type": "literal", "find": "granulomata", "replace": "granulomas" },
+                { "type": "literal", "find": "Granulomata", "replace": "Granulomas" },
+                { "type": "regex", "find": "(d)iverticuli", "replace": "$1iverticula" }
+            ]
+        },
+        {
+            "name": "Chest-reported-separately phrasing",
+            "rules": [
+                { "type": "literal", "find": "See same day CT chest for additional details.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Same day Chest CT reported separately.", "replace": "Reported separately." },
+                { "type": "literal", "find": "CT chest from the same day is reported separately.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Please refer to separately dictated same-day CT chest for additional findings.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Refer to the separately dictated CT chest for thoracic findings.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Please see the separately reported dedicated chest CT for evaluation of the thoracic structures.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Separately dictated.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Separately reported.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Please refer to separately dictated CT chest report.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Dictated separately.", "replace": "Reported separately." },
+                { "type": "literal", "find": "CT chest is dictated separately.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Please refer to separately dictated CT Chest report.", "replace": "Reported separately." },
+                { "type": "literal", "find": "See separate dictation of the chest for details.", "replace": "Reported separately." },
+                { "type": "literal", "find": "See separate dictation of the chest.", "replace": "Reported separately." },
+                { "type": "literal", "find": "Please see separately dictated concurrent CT chest report for respective findings.", "replace": "Reported separately." },
+                { "type": "literal", "find": "The findings of the chest will be described in a separately dictated report for the dedicated chest CT performed on the same date.", "replace": "Reported separately." }
+            ]
+        },
+        {
+            "name": "Breast implant terminology",
+            "rules": [
+                { "type": "regex", "find": "(?<=breast) implant\\b", "replace": " prosthesis" },
+                { "type": "regex", "find": "(?<=breast) implants\\b", "replace": " prostheses" }
+            ]
+        },
+        {
+            "name": "Liver/falciform terminology",
+            "rules": [
+                { "type": "literal", "find": "Focal fatty infiltration adjacent to the falciform ligament.", "replace": "Perifalciform steatosis." },
+                { "type": "literal", "find": "Focal fatty infiltration along the falciform ligament.", "replace": "Perifalciform steatosis." }
+            ]
+        },
+        {
+            "name": "Bone lesion terminology",
+            "rules": [
+                { "type": "literal", "find": "No destructive osseous lesions.", "replace": "No suspicious bone lesions." },
+                { "type": "literal", "find": "No destructive osseous abnormalities.", "replace": "No suspicious bone lesions." },
+                { "type": "literal", "find": "No suspicious osteolytic/osteoblastic lesions.", "replace": "No suspicious bone lesions." },
+                { "type": "regex", "find": "pars defect[s]?\\b", "replace": "spondylolysis" },
+                { "type": "regex", "find": "Pars defect[s]?\\b", "replace": "Spondylolysis" }
+            ]
+        },
+        {
+            "name": "Degenerative changes trimming",
+            "rules": [
+                { "type": "regex", "find": "(mild |moderate )?degenerative changes of the spine\\.( )?", "replace": "$2" },
+                { "type": "regex", "find": "Spinal degenerative changes\\.( )?", "replace": "$1" },
+                { "type": "regex", "find": "Skeletal degenerative changes\\.( )?", "replace": "$1" },
+                { "type": "regex", "find": "Multilevel degenerative changes\\.( )?", "replace": "$1" },
+                { "type": "regex", "find": "Degenerative changes of the spine\\.( )?", "replace": "$1" },
+                { "type": "regex", "find": "Degenerative changes\\.( )?", "replace": "$1" }
+            ]
+        },
+        {
+            "name": "Hyphenation/casing normalization",
+            "rules": [
+                { "type": "regex", "find": "(n|N)on-inflamed", "replace": "$1oninflamed" },
+                { "type": "regex", "find": "(c)holelithiasis", "replace": "$1holecystolithiasis" }
+            ]
+        },
+        {
+            "name": "Pancreas terminology",
+            "rules": [
+                { "type": "literal", "find": "Distal pancreatectomy", "replace": "Tail pancreatectomy" },
+                { "type": "literal", "find": "distal pancreatectomy", "replace": "tail pancreatectomy" },
+                { "type": "literal", "find": "Whipple's procedure", "replace": "Pancreaticoduodenectomy" },
+                { "type": "literal", "find": "Whipple", "replace": "Pancreaticoduodenectomy" }
+            ]
+        },
+        {
+            "name": "Gallbladder terminology",
+            "rules": [
+                { "type": "literal", "find": "Prior cholecystectomy.", "replace": "Cholecystectomy." },
+                { "type": "literal", "find": "Status post cholecystectomy.", "replace": "Cholecystectomy." },
+                { "type": "literal", "find": "Postsurgical changes of cholecystectomy.", "replace": "Cholecystectomy." },
+                { "type": "literal", "find": "The gallbladder is surgically absent.", "replace": "Cholecystectomy." },
+                { "type": "literal", "find": "Gallbladder is surgically absent.", "replace": "Cholecystectomy." },
+                { "type": "literal", "find": "Gallbladder is not inflamed.", "replace": "Noninflamed gallbladder." }
+            ]
+        },
+        {
+            "name": "Uterus/GYN terminology",
+            "rules": [
+                { "type": "literal", "find": "Fibroid uterus.", "replace": "Leiomyomatous uterus." },
+                { "type": "literal", "find": "fibroid uterus", "replace": "leiomyomatous uterus" },
+                { "type": "literal", "find": "Fibroid", "replace": "Leiomyoma" },
+                { "type": "literal", "find": "fibroid", "replace": "leiomyoma" },
+                { "type": "literal", "find": "Uterus surgically absent.", "replace": "Hysterectomy." },
+                { "type": "literal", "find": "pouch of Douglas", "replace": "rectouterine pouch" },
+                { "type": "literal", "find": "Pouch of Douglas", "replace": "Rectouterine pouch" }
+            ]
+        },
+        {
+            "name": "Appendix terminology",
+            "rules": [
+                { "type": "literal", "find": "Appendix is normal.", "replace": "Normal appendix." },
+                { "type": "literal", "find": "Noninflamed appendix in the right lower quadrant.", "replace": "Normal appendix." },
+                { "type": "literal", "find": "Unremarkable appendix.", "replace": "Normal appendix." }
+            ]
+        },
+        {
+            "name": "GI junction / GU junction terminology",
+            "rules": [
+                { "type": "literal", "find": "gastroesophageal junction", "replace": "esophagogastric junction" },
+                { "type": "literal", "find": "Gastroesophageal junction", "replace": "Esophagogastric junction" },
+                { "type": "literal", "find": "GE junction", "replace": "Esophagogastric junction" },
+                { "type": "literal", "find": "UPJ", "replace": "Ureteropelvic junction" },
+                { "type": "literal", "find": "UVJ", "replace": "Ureterovesicular junction" },
+                { "type": "literal", "find": "Sphincter of Oddi", "replace": "Choledochal sphincter" }
+            ]
+        },
+        {
+            "name": "Misc anatomic terminology",
+            "rules": [
+                { "type": "literal", "find": "Roux-en-Y", "replace": "Y" },
+                { "type": "literal", "find": "Morison's pouch", "replace": "Hepatorenal recess" }
+            ]
+        },
+        {
+            "name": "Catheter terminology",
+            "rules": [
+                { "type": "regex", "find": "(?<=\\w)[\\s]*?Foley catheter", "replace": " urinary catheter" },
+                { "type": "regex", "find": "(?<=,)[\\s]*?Foley catheter", "replace": " urinary catheter" },
+                { "type": "regex", "find": "(?<=[.:;])[\\s]*?Foley catheter", "replace": " Urinary catheter" }
+            ]
+        },
+        {
+            "name": "Devices/lines terminology",
+            "rules": [
+                { "type": "literal", "find": "Port-A-Cath", "replace": "port" },
+                { "type": "regex", "find": "(right|left) IJ", "replace": "$1 internal jugular" },
+                { "type": "literal", "find": "Left IJ", "replace": "Left internal jugular" },
+                { "type": "literal", "find": "Right IJ", "replace": "Right internal jugular" },
+                { "type": "literal", "find": "left IJ", "replace": "Left internal jugular" },
+                { "type": "literal", "find": "right IJ", "replace": "Right internal jugular" }
+            ]
+        },
+        {
+            "name": "Date formatting",
+            "_note": "Converts M/D/YYYY or Month D, YYYY into a final YYYY-Mon-DD format. Order matters -- run top to bottom.",
+            "rules": [
+                { "type": "regex", "find": "\\b([\\d]{1,2}/[\\d]{1,2})/([\\d]{2})\\b", "replace": "$1/20$2" },
+
+                { "type": "regex", "find": "0?1/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Jan-$2" },
+                { "type": "regex", "find": "0?2/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Feb-$2" },
+                { "type": "regex", "find": "0?3/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Mar-$2" },
+                { "type": "regex", "find": "0?4/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Apr-$2" },
+                { "type": "regex", "find": "0?5/([\\d]{1,2})/([\\d]{4})", "replace": "$1-May-$2" },
+                { "type": "regex", "find": "0?6/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Jun-$2" },
+                { "type": "regex", "find": "0?7/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Jul-$2" },
+                { "type": "regex", "find": "0?8/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Aug-$2" },
+                { "type": "regex", "find": "0?9/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Sep-$2" },
+                { "type": "regex", "find": "10/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Oct-$2" },
+                { "type": "regex", "find": "11/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Nov-$2" },
+                { "type": "regex", "find": "12/([\\d]{1,2})/([\\d]{4})", "replace": "$1-Dec-$2" },
+
+                { "type": "regex", "find": "\\b(January)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Jan-$3" },
+                { "type": "regex", "find": "\\b(February)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Feb-$3" },
+                { "type": "regex", "find": "\\b(March)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Mar-$3" },
+                { "type": "regex", "find": "\\b(April)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Apr-$3" },
+                { "type": "regex", "find": "\\b(May)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-May-$3" },
+                { "type": "regex", "find": "\\b(June)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Jun-$3" },
+                { "type": "regex", "find": "\\b(July)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Jul-$3" },
+                { "type": "regex", "find": "\\b(August)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Aug-$3" },
+                { "type": "regex", "find": "\\b(September)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Sep-$3" },
+                { "type": "regex", "find": "\\b(October)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Oct-$3" },
+                { "type": "regex", "find": "\\b(November)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Nov-$3" },
+                { "type": "regex", "find": "\\b(December)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Dec-$3" },
+
+                { "type": "regex", "find": "[\\d]{1}-[A-Z][a-z]{2}-[\\d]{4}", "replace": "0$0" },
+                { "type": "regex", "find": "([\\d]{2})-([A-Z][a-z]{2})-([\\d]{4})", "replace": "$3-$2-$1" }
+            ]
+        },
+        {
+            "name": "Reference/series formatting",
+            "rules": [
+                { "type": "regex", "find": "series ([\\d]+)[:;,]?[ ]*?image[s]? ", "replace": "$1:" },
+                { "type": "regex", "find": "image[s]? ([\\d, ]+?)[, and]? [of ]?series ([\\d]+?)\\b", "replace": "$2:$1" },
+                { "type": "regex", "find": "SE ([\\d]+?) IM[ ]?([\\d]+?)\\b", "replace": "$1:$2" },
+                { "type": "regex", "find": "\\(([\\d]+)/([\\d]+)\\)", "replace": "($1:$2)" },
+                { "type": "regex", "find": "\\(([\\d]+?), ([\\d]+?)\\)", "replace": "($1:$2)" },
+                { "type": "regex", "find": "[\\[\\(]([\\d]+).([\\d]+)[\\)\\]]", "replace": "($1:$2)" },
+                { "type": "regex", "find": "\\(([\\d]+?);[ ]*?([\\d]+?)\\)", "replace": "($1:$2)" }
+            ]
+        }
+    ]
+}

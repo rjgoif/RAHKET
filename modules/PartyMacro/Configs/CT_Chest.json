@@ -1,0 +1,86 @@
+{
+    "_description": "Config for CT Chest (with contrast) party macro conversion. Universal rules (Rules/universal_rules.json) always run first; additionalRules below run after, for chest/cardiac-specific edits.",
+
+    "name": "CT Chest",
+    "modality": "CT",
+
+    "examMatch": {
+        "_note": "Verified 2026-08-12 against a real copied header (\"CT CHEST WITH CONTRAST\"). Deliberately narrow -- does NOT match \"CT CHEST PULMONARY ANGIOGRAM\" or other chest protocols.",
+        "patterns": [
+            "CT\\s+CHEST\\s+WITH\\s+CONTRAST"
+        ]
+    },
+
+    "measurementUnit": "mm",
+    "_measurementUnitNote": "Defaulted to mm since pulmonary nodules are conventionally reported in mm. Change to \"cm\" if that's not the preference.",
+
+    "reflowThreshold": 3,
+
+    "templateFile": "CT_Chest.rtf",
+
+    "additionalRules": [
+        { "_note": "Chest/cardiac-specific -- confirmed against your real HARM CT Chest source and QM macro", "type": "regex", "find": "Attention on follow[- ]?up\\.", "replace": "" },
+
+        { "type": "literal", "find": "The cardiac chambers are normal in size. The thoracic aorta is nondilated. The main pulmonary artery is normal in size.", "replace": "Nonenlarged cardiac chambers and great vessels." },
+        { "type": "literal", "find": "Cardiac size is normal.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Cardiac chambers are normal in size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "The cardiac chambers are within normal limits in size", "replace": "Nonenlarged cardiac chambers" },
+        { "type": "literal", "find": "Heart chambers are not significantly enlarged.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Heart chambers are normal in size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Heart chambers are not enlarged.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Normal heart size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Cardiac chambers are within normal size limits.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Heart is within normal limits of size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "The heart chambers are within normal limits of size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Heart chambers are within normal limits of size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "Cardiac chambers within normal limits in size.", "replace": "Nonenlarged cardiac chambers." },
+        { "type": "literal", "find": "The cardiac chambers are normal in size and there is no evidence of pericardial effusion.", "replace": "Nonenlarged cardiac chambers. No pericardial effusion." },
+
+        { "type": "regex", "find": "Vascular calcifications are seen within the aorta\\.( )?", "replace": "$1" },
+
+        { "type": "literal", "find": "The central airways are patent.", "replace": "Patent central airways." },
+        { "type": "literal", "find": "Central airways are clear.", "replace": "Patent central airways." },
+        { "type": "literal", "find": "There airways are patent.", "replace": "Patent central airways." },
+        { "type": "literal", "find": "The airways are patent.", "replace": "Patent central airways." },
+        { "type": "literal", "find": "Central airways are patent.", "replace": "Patent central airways." },
+        { "type": "literal", "find": "The major airways are patent.", "replace": "Patent central airways." },
+
+        { "_note": "Coronary phrasing cleanup -- applies to the Mediastinum text, since that's where coronary language actually lives in a real report (no separate 'Coronary:' source line exists).",
+          "type": "literal", "find": "No coronary calcification.", "replace": "No apparent coronary artery calcification." },
+        { "type": "literal", "find": "coronary calcifications", "replace": "coronary artery calcifications" },
+        { "type": "literal", "find": "amount of coronary", "replace": "coronary" },
+
+        { "type": "literal", "find": "No pleural effusion or pneumothorax.", "replace": "No pleural effusions or pneumothoraces." },
+        { "type": "literal", "find": "No new or increased pulmonary nodule.", "replace": "No new or increased pulmonary nodules." },
+
+        { "_note": "Upper Abdomen field's 'reported separately' phrasing variants (chest report deferring to a same-day abdomen CT)",
+          "type": "literal", "find": "Dictated separately.", "replace": "Reported separately." },
+        { "type": "literal", "find": "Please see concurrent abdominal CT for abdominal findings.", "replace": "Reported separately." },
+        { "type": "literal", "find": "Separately reported.", "replace": "Reported separately." },
+        { "type": "regex", "find": "Separately dictated(\\.)?", "replace": "Reported separately." },
+        { "type": "regex", "find": "Please[\\s]*?see[\\s]*?concurrent[\\s]*?abdominal[\\s]*?CT[\\s]*?for[\\s]*?abdominal[\\s]*?findings\\.", "replace": "Reported separately." },
+        { "type": "regex", "find": "Please see same-day CT abdomen and pelvis for detailed evaluation.", "replace": "Reported separately." },
+        { "type": "regex", "find": "Please refer to separately dictated CT abdomen and pelvis.", "replace": "Reported separately." },
+        { "type": "literal", "find": "Please see same-day CT abdomen/pelvis dictated separately for abdominal findings.", "replace": "Reported separately." },
+        { "type": "literal", "find": "Please see same day CT abdomen report.", "replace": "Reported separately." },
+        { "type": "literal", "find": "Please see concurrent day CT abdomen report.", "replace": "Reported separately." }
+    ],
+
+    "sections": [
+        { "_note": "sourceLabel may be a single label or an array of fallback labels tried in order. Confirmed against your real HARM CT Chest template.",
+          "sourceLabel": "Devices/Tubes/Lines", "outputField": "Lines", "mode": "extract" },
+        { "sourceLabel": ["Lungs", "Lungs/airways"], "outputField": "Lungs", "mode": "extract" },
+        { "sourceLabel": "Pleura", "outputField": "Pleura", "mode": "extract" },
+        { "sourceLabel": "Mediastinum", "outputField": "Mediastinum", "mode": "extract" },
+
+        { "_note": "conditionalOmit: Coronary is a live picklist field in the template and is left untouched by default. Confirmed against your real QM logic -- scans the Mediastinum text specifically (not the whole report) for the word 'coronary', since that's exactly where coronary language lands when the HARM Coronary picklist is filled in and appended to the Mediastinum sentence during dictation. If found, the standalone Coronary field is stripped from the party output as redundant.",
+          "outputField": "Coronary", "mode": "conditionalOmit", "scanField": "Mediastinum", "scanWholeSource": false,
+          "keywords": ["coronary"],
+          "rtfLineToRemove": "\\cf2 Coronary\\cf1 :none/mild/moderate/severe\\cf2\\par\r\n" },
+
+        { "sourceLabel": "Lymph Nodes", "outputField": "Nodes", "mode": "extract" },
+        { "sourceLabel": "Upper Abdomen", "outputField": "Abdomen", "mode": "extract" },
+        { "sourceLabel": "Chest Wall", "outputField": "Chest wall", "mode": "extract" },
+        { "sourceLabel": "Bones", "outputField": "Bones", "mode": "extract" }
+    ]
+}
