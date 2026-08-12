@@ -7,8 +7,8 @@
 #SingleInstance Force
 Persistent
 
-RAHKET_VERSION := "1.00.20"
-;@Ahk2Exe-SetVersion 1.00.20
+RAHKET_VERSION := "1.00.21"
+;@Ahk2Exe-SetVersion 1.00.21
 ;@Ahk2Exe-SetDescription RAHKET - Radiology AutoHotKey Enhancement Tools
 ;@Ahk2Exe-SetProductName RAHKET
 ;@Ahk2Exe-SetCompanyName Reece J. Goiffon MD PhD

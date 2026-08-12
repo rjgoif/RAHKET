@@ -22,6 +22,31 @@ if (A_LineFile = A_ScriptFullPath) {
     Show_NoduleHunter()
 }
 
+; --- Monitor targeting -------------------------------------------------
+; Finds the monitor containing PowerScribe One's window, or the monitor
+; the mouse is on if PowerScribe isn't found.
+GetMonitorContaining(px, py) {
+    Loop MonitorGetCount() {
+        MonitorGet(A_Index, &L, &T, &R, &B)
+        if (px >= L && px < R && py >= T && py < B)
+            return {L: L, T: T, R: R, B: B}
+    }
+    MonitorGet(MonitorGetPrimary(), &L, &T, &R, &B)
+    return {L: L, T: T, R: R, B: B}
+}
+
+GetTargetMonitor() {
+    ; Title-based match since the exe name isn't confirmed.
+    ; Adjust "PowerScribe" below if the window title differs.
+    psHwnd := WinExist("PowerScribe")
+    if psHwnd {
+        WinGetPos(&wx, &wy, &ww, &wh, "ahk_id " psHwnd)
+        return GetMonitorContaining(wx + ww // 2, wy + wh // 2)
+    }
+    MouseGetPos(&mx, &my)
+    return GetMonitorContaining(mx, my)
+}
+
 Show_NoduleHunter() {
     NH := Gui(, "Nodule Hunter")
     NH.OnEvent("Close", (*) => NH.Destroy())
@@ -86,7 +111,11 @@ Show_NoduleHunter() {
 	NH_CloseBtn.OnEvent("Click", NH_CloseGui)
 
 
-    NH.Show("w630 h380")
+    guiW := 630, guiH := 380
+    mon := GetTargetMonitor()
+    xx := mon.L + (mon.R - mon.L - guiW) // 2
+    yy := mon.T + (mon.B - mon.T - guiH) // 2
+    NH.Show("w" guiW " h" guiH " x" xx " y" yy)
 }
 
 
