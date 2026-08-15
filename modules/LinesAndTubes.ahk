@@ -95,6 +95,13 @@ LT_ImageWinVisible  := false  ; avoids redundant Show() calls while already visi
 LT_ImageCurrentKey  := ""     ; which image is currently loaded ("" = none shown)
 LT_ImageCurrentInst := ""     ; which instance's fields a click should update
 
+; GDI+ state for drawing a translucent highlight over the currently-
+; selected region on top of the base diagram. Started once, never shut
+; down (the process reclaims it on exit like everything else here).
+LT_GdipToken          := 0
+LT_GdipImageBitmaps    := Map()  ; imageKey -> loaded GDI+ Bitmap pointer
+LT_ImageCurrentHBitmap := 0      ; the HBITMAP currently shown in the Picture control, so it can be freed before being replaced
+
 ; Dynamic middle-column controls, tracked so a rebuild can hide the old set
 ; instead of destroying anything
 LT_MiddleControls := []
@@ -2710,6 +2717,132 @@ LT_RenderInstancePanel(g, x, y, w, instId) {
 ; IMAGE-MAP POPUP (click-region diagram)
 ; ============================================================================
 
+LT_GdipStartup() {
+    global LT_GdipToken
+    if (LT_GdipToken)
+        return
+    si := Buffer(24, 0)
+    NumPut("UInt", 1, si, 0)  ; GdiplusVersion = 1
+    DllCall("gdiplus\GdiplusStartup", "ptr*", &LT_GdipToken, "ptr", si, "ptr", 0)
+}
+
+; Loads (once per image, cached) the base diagram as a GDI+ Bitmap so it
+; can be redrawn with a highlight composited on top every time the
+; selection or window size changes.
+LT_GdipLoadImage(imageKey, path) {
+    global LT_GdipImageBitmaps
+    if (LT_GdipImageBitmaps.Has(imageKey))
+        return LT_GdipImageBitmaps[imageKey]
+    LT_GdipStartup()
+    pBitmap := 0
+    DllCall("gdiplus\GdipCreateBitmapFromFile", "wstr", path, "ptr*", &pBitmap)
+    LT_GdipImageBitmaps[imageKey] := pBitmap
+    return pBitmap
+}
+
+; Which region name(s), if any, correspond to the current instance's
+; already-made selections -- the reverse of LT_VeinRegionMap, used to
+; decide what to highlight. Both a resolved tip state and a chosen side
+; can be highlighted at once, since they're independent fields.
+LT_FindSelectedRegionNames() {
+    global LT_Instances, LT_ImageCurrentInst, LT_VeinRegionMap
+    names := []
+    if (LT_ImageCurrentInst = "" || !LT_Instances.Has(LT_ImageCurrentInst))
+        return names
+
+    fields := LT_Instances[LT_ImageCurrentInst]["fields"]
+    curTipState := fields.Get("tip", "")
+    curSide := fields.Get("laterality", "")
+
+    for name, target in LT_VeinRegionMap {
+        if (target.Has("state") && curTipState != "" && target["state"] = curTipState)
+            names.Push(name)
+        else if (target.Has("side") && curSide != "" && target["side"] = curSide)
+            names.Push(name)
+    }
+    return names
+}
+
+; Composites the base image plus a translucent fill over every currently-
+; selected region's actual traced polygon (scaled to the current display
+; size) into a fresh bitmap, and shows that on the Picture control.
+LT_RenderImageWithHighlight(dispW, dispH) {
+    global LT_ImagePicture, LT_ImageCurrentKey, LT_ImageCurrentHBitmap
+    global LT_GdipImageBitmaps, LT_VeinImageRegions, LT_VeinImageNativeW, LT_VeinImageNativeH
+
+    if (LT_ImageCurrentKey = "" || !LT_GdipImageBitmaps.Has(LT_ImageCurrentKey))
+        return
+    pBitmap := LT_GdipImageBitmaps[LT_ImageCurrentKey]
+    if (!pBitmap || dispW <= 0 || dispH <= 0)
+        return
+
+    PixelFormat32bppPARGB := 0x26200A
+    pCanvas := 0
+    DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", dispW, "int", dispH, "int", 0, "int", PixelFormat32bppPARGB, "ptr", 0, "ptr*", &pCanvas)
+    if (!pCanvas)
+        return
+
+    pGraphics := 0
+    DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pCanvas, "ptr*", &pGraphics)
+    DllCall("gdiplus\GdipSetInterpolationMode", "ptr", pGraphics, "int", 7)  ; HighQualityBicubic
+    DllCall("gdiplus\GdipDrawImageRectI", "ptr", pGraphics, "ptr", pBitmap, "int", 0, "int", 0, "int", dispW, "int", dispH)
+
+    regionNames := (LT_ImageCurrentKey = "vein") ? LT_FindSelectedRegionNames() : []
+    if (regionNames.Length > 0 && LT_ImageCurrentKey = "vein") {
+        scaleX := dispW / LT_VeinImageNativeW
+        scaleY := dispH / LT_VeinImageNativeH
+        pBrush := 0
+        DllCall("gdiplus\GdipCreateSolidFill", "uint", 0x6E1E90FF, "ptr*", &pBrush)  ; translucent dodger-blue
+        for region in LT_VeinImageRegions {
+            matched := false
+            for n in regionNames {
+                if (n = region["name"]) {
+                    matched := true
+                    break
+                }
+            }
+            if (!matched)
+                continue
+            pts := region["points"]
+            n := pts.Length
+            buf := Buffer(8 * n, 0)
+            Loop n {
+                NumPut("Int", Round(pts[A_Index][1] * scaleX), buf, (A_Index - 1) * 8)
+                NumPut("Int", Round(pts[A_Index][2] * scaleY), buf, (A_Index - 1) * 8 + 4)
+            }
+            DllCall("gdiplus\GdipFillPolygonI", "ptr", pGraphics, "ptr", pBrush, "ptr", buf, "int", n, "int", 0)
+        }
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
+    }
+
+    DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
+
+    hBitmap := 0
+    DllCall("gdiplus\GdipCreateHBITMAPFromBitmap", "ptr", pCanvas, "ptr*", &hBitmap, "uint", 0xFFFFFFFF)
+    DllCall("gdiplus\GdipDisposeImage", "ptr", pCanvas)
+    if (!hBitmap)
+        return
+
+    try LT_ImagePicture.Value := "HBITMAP:" hBitmap
+    if (LT_ImageCurrentHBitmap)
+        try DllCall("DeleteObject", "ptr", LT_ImageCurrentHBitmap)
+    LT_ImageCurrentHBitmap := hBitmap
+}
+
+; Re-renders at whatever size the popup is currently displayed at --
+; called after showing, resizing, or any click that changes a selection.
+LT_RefreshImageDisplay() {
+    global LT_ImageGui, LT_ImageCurrentKey
+    if (!IsObject(LT_ImageGui) || LT_ImageCurrentKey = "")
+        return
+    rect := Buffer(16, 0)
+    try DllCall("GetClientRect", "ptr", LT_ImageGui.Hwnd, "ptr", rect)
+    dispW := NumGet(rect, 8, "int")
+    dispH := NumGet(rect, 12, "int")
+    if (dispW > 0 && dispH > 0)
+        LT_RenderImageWithHighlight(dispW, dispH)
+}
+
 ; Point-in-polygon test (standard even-odd ray-casting rule).
 LT_PointInPolygon(px, py, points) {
     inside := false
@@ -2788,6 +2921,7 @@ LT_OnImageResize(GuiObj, MinMax, W, H) {
     if (MinMax = -1)  ; minimized
         return
     LT_SyncImagePictureSize()
+    LT_RefreshImageDisplay()
     LT_SaveImageWinGeometry()
 }
 
@@ -2817,27 +2951,27 @@ LT_ShowImagePopup(imageKey, instId) {
         imgPath := LT_ImageDir "\" imageKey ".png"
         if (!FileExist(imgPath))
             return
-        try LT_ImagePicture.Value := imgPath
+        LT_GdipLoadImage(imageKey, imgPath)
         LT_ImageCurrentKey := imageKey
     }
 
-    if (LT_ImageWinVisible)
-        return  ; already showing -- nothing else to do
-
-    if (!LT_ImageWinKnown) {
-        mx := 0, my := 0, mw := 0, mh := 0
-        if (IsObject(LT_GuiObj))
-            try LT_GuiObj.GetPos(&mx, &my, &mw, &mh)
-        LT_ImageWinW := 480
-        LT_ImageWinH := 480
-        LT_ImageWinX := mx - LT_ImageWinW - 15
-        LT_ImageWinY := my
-        LT_ImageWinKnown := true
+    if (!LT_ImageWinVisible) {
+        if (!LT_ImageWinKnown) {
+            mx := 0, my := 0, mw := 0, mh := 0
+            if (IsObject(LT_GuiObj))
+                try LT_GuiObj.GetPos(&mx, &my, &mw, &mh)
+            LT_ImageWinW := 480
+            LT_ImageWinH := 480
+            LT_ImageWinX := mx - LT_ImageWinW - 15
+            LT_ImageWinY := my
+            LT_ImageWinKnown := true
+        }
+        try LT_ImageGui.Show("x" LT_ImageWinX " y" LT_ImageWinY " w" LT_ImageWinW " h" LT_ImageWinH)
+        LT_ImageWinVisible := true
+        LT_SyncImagePictureSize()
     }
 
-    try LT_ImageGui.Show("x" LT_ImageWinX " y" LT_ImageWinY " w" LT_ImageWinW " h" LT_ImageWinH)
-    LT_ImageWinVisible := true
-    LT_SyncImagePictureSize()
+    LT_RefreshImageDisplay()
 }
 
 LT_HideImagePopup() {
