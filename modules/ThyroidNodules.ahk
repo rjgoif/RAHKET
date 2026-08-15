@@ -388,6 +388,9 @@ Show_ThyroidNodules() {
     TN.Add("Button", "x120 y" buttonY " w140 h30 vTN_RecsBtn", "Recommendations")
         .OnEvent("Click", TN_ShowRecommendations)
 
+    TN.Add("Button", "x270 y" buttonY " w160 h30 vTN_CopyFindingsBtn", "Copy Findings Only")
+        .OnEvent("Click", TN_CopyFindingsOnly)
+
     TN.Add("Button", "x1110 y" buttonY " w100 h30 vTN_CloseBtn", "Close")
         .OnEvent("Click", TN_Close)
 
@@ -748,6 +751,7 @@ TN_SplitterDrag() {
     TN_GuiObj["TN_CopyBtn"].Move(, buttonY)
     TN_GuiObj["TN_ClearBtn"].Move(, buttonY)
     TN_GuiObj["TN_RecsBtn"].Move(, buttonY)
+    TN_GuiObj["TN_CopyFindingsBtn"].Move(, buttonY)
     TN_GuiObj["TN_CloseBtn"].Move(, buttonY)
 }
 
@@ -791,6 +795,7 @@ TN_OnResize(GuiObj, MinMax, Width, Height) {
     GuiObj["TN_CopyBtn"].Move(, buttonY)
     GuiObj["TN_ClearBtn"].Move(, buttonY)
     GuiObj["TN_RecsBtn"].Move(, buttonY)
+    GuiObj["TN_CopyFindingsBtn"].Move(, buttonY)
     GuiObj["TN_CloseBtn"].Move(Width - 110, buttonY)
 
 }
@@ -2237,10 +2242,15 @@ TN_UpdateFieldColors() {
 
 
 TN_XmlEscape(str) {
-    ; Minimal XML escaping: & < >
+    ; Minimal XML escaping: & < >, plus the bullet character encoded as
+    ; a numeric entity -- matching exactly how PS360's own bulleted
+    ; field defaultvalue text stores it (verified against a real native
+    ; PS360 export) -- rather than relying on a raw Unicode byte
+    ; surviving the clipboard's codepage conversion intact.
     str := StrReplace(str, "&", "&amp;")
     str := StrReplace(str, "<", "&lt;")
     str := StrReplace(str, ">", "&gt;")
+    str := StrReplace(str, Chr(0x2022), "&#x2022;")
     return str
 }
 
@@ -2288,7 +2298,6 @@ Left nodes\par
 Verbal Prelim\par
 \cf1\par
 Glossary of terms and other information on TI-RADS (Thyroid Imaging Reporting and Data System) can be found at \cf3 https://www.acr.org/Clinical-Resources/Clinical-Tools-and-Reference/Reporting-and-Data-Systems/TI-RADS\cf1\par
-\fs20\par
 }
  {\xml}<?xml version="1.0" encoding="utf8"?><autotext version="2" editMode="2"><fields><field type="1" start="20" length="7"><name>isthmus</name><defaultvalue>4 mm</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>True</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="35" length="15"><name>isthmus nodules</name><defaultvalue>isthmus nodules</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>False</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="68" length="5"><name>right</name><defaultvalue>36 mm</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>True</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="105" length="13"><name>right nodules</name><defaultvalue>right nodules</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>False</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="119" length="11"><name>Right nodes</name><defaultvalue>No right lymphadenopathy.</defaultvalue><customproperties><property><name>ImpressionField</name><value>False</value></property><property><name>IncludeInImpression</name><value>False</value></property><property><name>FindingsCodes</name><value></value></property></customproperties></field><field type="1" start="147" length="4"><name>left</name><defaultvalue>49 mm</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>True</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="183" length="12"><name>left nodules</name><defaultvalue>left nodules</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>False</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="196" length="10"><name>Left nodes</name><defaultvalue>No left lymphadenopathy.</defaultvalue><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>True</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="3" start="209" length="28"><name>parathyroid</name><choices><choice name="none"></choice><choice name="parathyroid">Parathyroid: No candidate adenoma.</choice></choices><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>False</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="3" start="251" length="217"><name>IMPRESSION</name><choices><choice name="0-1 benign, no FNA"></choice><choice name="2 not susp, no FNA"></choice><choice name="3&amp;&#x2265;1.5cm mildly susp, +1/3/5y"></choice><choice name="3&amp;&#x2265;2.5cm mildly susp, FNA"></choice><choice name="4-6&amp;&#x2265;1cm mod susp, +1/2/3/5y"></choice><choice name="4-6&amp;&#x2265;1.5cm mod susp, FNA"></choice><choice name="&#x2265;7&amp;&#x2265;0.5cm highly susp, +1/2/3/4/5y"></choice><choice name="&#x2265;7&amp;&#x2265;1cm highly susp, +FNA"></choice></choices><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>AllowEmpty</name><value>False</value></property><property><name>ImpressionField</name><value>True</value></property><property><name>DoesNotIndicateFindings</name><value>True</value></property><property><name>FindingsCodes</name><value></value></property><property><name>EnforcePickList</name><value>False</value></property></customproperties></field><field type="1" start="470" length="16"><name>RECOMMENDATIONS:</name><customproperties><property><name>AllCaps</name><value>False</value></property><property><name>ImpressionField</name><value>False</value></property><property><name>DoesNotIndicateFindings</name><value>True</value></property><property><name>FindingsCodes</name><value></value></property></customproperties></field><field type="4" start="487" length="13" mergeid="10000" mergename="Verbal Prelim"><name>Verbal Prelim</name></field></fields><links><link target="at https://www.acr.org/Clinical-Resources/Clinical-Tools-and-Reference/Reporting-and-Data-Systems/TI-RADS" detected="1" start="613" length="73"><name>link</name></link></links><textSource><range type="1" start="20" length="7" /><range type="1" start="35" length="15" /><range type="1" start="68" length="5" /><range type="1" start="105" length="13" /><range type="1" start="119" length="11" /><range type="1" start="147" length="4" /><range type="1" start="183" length="12" /><range type="1" start="196" length="10" /><range type="3" start="209" length="11" /><range type="3" start="251" length="10" /><range type="1" start="470" length="16" /><range type="4" start="487" length="13" /></textSource></autotext>
  )'
@@ -2302,86 +2311,407 @@ TN_CopyReport(*) {
     global TN_RtfTemplate
     global TN_IsthmusText, TN_RightText, TN_LeftText
 
-    ; Plain text for non-RTF paste targets
-    plain := TN_GuiObj["TN_OutputBox"].Value
+    ; Plain text for non-RTF paste targets (PS360 itself prefers the RTF
+    ; below, but this keeps other paste targets consistent with it)
+    plain := TN_BuildFindingsPlainText()
 
-    ; Start from the embedded template (your NEW DELETE TEMP.rtf content)
-    rtf := TN_RtfTemplate
+    ; Split the template into its RTF body and its XML autotext sidecar.
+    splitPos := InStr(TN_RtfTemplate, " {\xml}")
+    rtfBody := SubStr(TN_RtfTemplate, 1, splitPos - 1)
+    xmlPart := SubStr(TN_RtfTemplate, splitPos + 7)
 
     ; ------------------------------------------------------------
-    ; 1) Length fields: "X mm" from the top of the GUI
+    ; 1) Length fields: "X mm" -- unaffected by anything below, since
+    ;    "isthmus" itself sits before any of the content we're changing.
+    ;    These stay live PS360 fields via defaultvalue.
     ;    XML field names: isthmus, right, left
     ; ------------------------------------------------------------
     istThick := Trim(TN_GuiObj["TN_IsthmusThickness"].Value)
     rightLen := Trim(TN_GuiObj["TN_RightLobeLength"].Value)
     leftLen  := Trim(TN_GuiObj["TN_LeftLobeLength"].Value)
 
-    if (istThick != "")
-        rtf := TN_XmlSetDefault(rtf, "isthmus", istThick " mm")
-    else
-        rtf := TN_XmlSetDefault(rtf, "isthmus", "")
-
-    if (rightLen != "")
-        rtf := TN_XmlSetDefault(rtf, "right", rightLen " mm")
-    else
-        rtf := TN_XmlSetDefault(rtf, "right", "")
-
-    if (leftLen != "")
-        rtf := TN_XmlSetDefault(rtf, "left", leftLen " mm")
-    else
-        rtf := TN_XmlSetDefault(rtf, "left", "")
+    xmlPart := TN_XmlSetDefault(xmlPart, "isthmus", istThick != "" ? istThick " mm" : "")
+    xmlPart := TN_XmlSetDefault(xmlPart, "right",   rightLen != "" ? rightLen " mm" : "")
+    xmlPart := TN_XmlSetDefault(xmlPart, "left",    leftLen  != "" ? leftLen  " mm" : "")
 
     ; ------------------------------------------------------------
-    ; 2) Nodule fields:
-    ;    XML field names: "isthmus nodules", "right nodules", "left nodules"
+    ; 2) Nodule content: a field's stored text can never trigger true
+    ;    hanging-indent bullet formatting in PS360 -- confirmed across
+    ;    multiple approaches, including that even a person manually
+    ;    clicking PS360's own Bullets button dissolves the field/XML
+    ;    sidecar entirely. So real bullets and field-editability are
+    ;    mutually exclusive in PS360 itself, not a RAHKET limitation.
+    ;    "isthmus/right/left nodules" are therefore embedded as real
+    ;    \pntext/\*\pn bullet RTF directly in the body (no longer live
+    ;    PS360 fields for this content specifically -- everything else
+    ;    stays field-based).
+    ; ------------------------------------------------------------
+    istFrag := TN_RtfParagraphsFromPlain(TN_FormatNoduleBlock(TN_IsthmusText, false))
+    rtFrag  := TN_RtfParagraphsFromPlain(TN_FormatNoduleBlock(TN_RightText))
+    ltFrag  := TN_RtfParagraphsFromPlain(TN_FormatNoduleBlock(TN_LeftText))
+
+    rtfBody := StrReplace(rtfBody, "isthmus nodules\par", istFrag)
+    rtfBody := StrReplace(rtfBody, "right nodules\par",   rtFrag)
+    rtfBody := StrReplace(rtfBody, "left nodules\par",    ltFrag)
+
+    xmlPart := TN_XmlRemoveField(xmlPart, "isthmus nodules", 35)
+    xmlPart := TN_XmlRemoveField(xmlPart, "right nodules",   105)
+    xmlPart := TN_XmlRemoveField(xmlPart, "left nodules",    183)
+
+    ; ------------------------------------------------------------
+    ; 3) The nodule fragments are variable-length, so every field after
+    ;    them has shifted. PS360 locates each remaining field by exact
+    ;    character offset into the document's plain-text projection
+    ;    (see TN_RtfToPlain). Recompute those offsets against the *new*
+    ;    body so the remaining fields still land correctly.
     ;
-    ;    Rule: IF there are nodules, wrap with a newline before and after,
-    ;    and those blank lines should NOT have bullets.
+    ;    Verified: 100% match against 24 known field positions across
+    ;    two real PS360 exports (non-bulleted), plus exact character-
+    ;    level reconciliation against two real untouched paste+copy
+    ;    tests with bulleted content (2 nodules/2 bullet-runs, and
+    ;    3 nodules/3 bullet-runs/7 bullet lines) -- both came back with
+    ;    zero corruption.
     ; ------------------------------------------------------------
+    plainProjection := TN_RtfToPlain(rtfBody)
+    cursor := 1
 
+    fieldAnchors := [
+        ["isthmus", "isthmus", 20],
+        ["right", "right lobe length", 68],
+        ["Right nodes", "Right nodes", 119],
+        ["left", "left lobe length", 147],
+        ["Left nodes", "Left nodes", 196],
+        ["parathyroid", "parathyroid:none/parathyroid", 209],
+        ["IMPRESSION", "IMPRESSION:0-1 benign, no FNA", 251],
+        ["RECOMMENDATIONS:", "RECOMMENDATIONS:", 470],
+        ["Verbal Prelim", "Verbal Prelim", 487],
+    ]
+
+    for _, entry in fieldAnchors {
+        fieldName := entry[1], anchor := entry[2], oldStart := entry[3]
+        newStart := TN_FindAnchor(plainProjection, anchor, &cursor)
+        xmlPart := TN_XmlSetFieldStart(xmlPart, fieldName, newStart)
+        xmlPart := TN_XmlSetRangeStart(xmlPart, oldStart, newStart)
+    }
+
+    ; ------------------------------------------------------------
+    ; 4) Recombine and put both plain text AND full RTF on clipboard
+    ; ------------------------------------------------------------
+    rtf := rtfBody " {\xml}" xmlPart
+    TN_SetClipboardTextAndRTF(plain, rtf)
+}
+
+
+; Reverses the "start"/"length" attributes back out of the RTF body to
+; the plain-text projection PS360 uses to locate autotext fields.
+; Verified (100% match) against 24 known field positions across TWO
+; independent real PS360 documents, PLUS reconciled character-for-
+; character against a real untouched RAHKET paste containing bulleted
+; content (a "Right nodes" field landed exactly 6 characters too late;
+; that 6 = 3 \pntext occurrences x 2 chars each, exactly, once pntext's
+; content is treated as zero-width). Two things had to both be true to
+; get here: \* unconditionally marks its destination as zero-width
+; (fixes a nested \*\pn/\pntxtb group being miscounted as +1/bullet-run),
+; AND \pntext itself is zero-width (fixes its "\xB7\tab" fallback text
+; being wrongly counted as +2/bullet-line). Both are now confirmed, not
+; hypothesized.
+TN_RtfToPlain(rtf) {
+    static skipWords := Map("fonttbl",1, "colortbl",1, "stylesheet",1
+        , "info",1, "fldinst",1, "pntext",1)
+
+    out := ""
+    i := 1
+    n := StrLen(rtf)
+    skipStack := [false]
+    uc := 1
+    pendingSkip := 0
+
+    while (i <= n) {
+        c := SubStr(rtf, i, 1)
+
+        if (c = "`r" || c = "`n") {
+            i += 1
+            continue
+        }
+        if (c = "{") {
+            skipStack.Push(skipStack[skipStack.Length])
+            i += 1
+            continue
+        }
+        if (c = "}") {
+            if (skipStack.Length > 1)
+                skipStack.Pop()
+            i += 1
+            continue
+        }
+        if (c = "\") {
+            j := i + 1
+            if (j <= n && SubStr(rtf, j, 1) = "*") {
+                ; \* means this whole destination is ignorable/skippable
+                ; -- unconditional, not dependent on which word follows.
+                skipStack[skipStack.Length] := true
+                i := j + 1
+                continue
+            }
+            if (j <= n && RegExMatch(SubStr(rtf, j, 1), "^[A-Za-z]$")) {
+                k := j
+                while (k <= n && RegExMatch(SubStr(rtf, k, 1), "^[A-Za-z]$"))
+                    k += 1
+                word := SubStr(rtf, j, k - j)
+                numStart := k
+                if (k <= n && RegExMatch(SubStr(rtf, k, 1), "^[\-0-9]$")) {
+                    k += 1
+                    while (k <= n && RegExMatch(SubStr(rtf, k, 1), "^[0-9]$"))
+                        k += 1
+                }
+                param := SubStr(rtf, numStart, k - numStart)
+                if (k <= n && SubStr(rtf, k, 1) = " ")
+                    k += 1
+
+                if (skipWords.Has(word))
+                    skipStack[skipStack.Length] := true
+                topSkip := skipStack[skipStack.Length]
+
+                if (word = "par") {
+                    if (!topSkip)
+                        out .= "`n"
+                } else if (word = "tab") {
+                    if (!topSkip)
+                        out .= "`t"
+                } else if (word = "bullet") {
+                    if (!topSkip)
+                        out .= Chr(0x2022)
+                } else if (word = "uc") {
+                    if (param != "")
+                        uc := Integer(param)
+                } else if (word = "u") {
+                    if (!topSkip && param != "") {
+                        code := Integer(param)
+                        if (code < 0)
+                            code += 65536
+                        out .= Chr(code)
+                    }
+                    pendingSkip := uc
+                }
+                i := k
+                continue
+            } else if (j <= n && SubStr(rtf, j, 1) = "'") {
+                hexPart := SubStr(rtf, j + 1, 2)
+                if (!skipStack[skipStack.Length])
+                    out .= Chr(Integer("0x" hexPart))
+                i := j + 3
+                continue
+            } else {
+                ch := (j <= n) ? SubStr(rtf, j, 1) : ""
+                if (!skipStack[skipStack.Length])
+                    out .= ch
+                i := j + 1
+                continue
+            }
+        } else {
+            if (pendingSkip > 0) {
+                pendingSkip -= 1
+                i += 1
+                continue
+            }
+            if (!skipStack[skipStack.Length])
+                out .= c
+            i += 1
+        }
+    }
+    return out
+}
+
+
+; Finds `anchor` in `plain` at or after `cursor` (1-indexed, case
+; sensitive), advances cursor past the match, and returns the match's
+; 0-indexed position (matching the XML "start" attribute convention).
+TN_FindAnchor(plain, anchor, &cursor) {
+    pos := InStr(plain, anchor, true, cursor)
+    if (!pos)
+        throw Error("TN_CopyReport: could not locate '" anchor "' while recomputing field positions -- report structure may have changed unexpectedly.")
+    cursor := pos + StrLen(anchor)
+    return pos - 1
+}
+
+
+; Rewrites the start="..." attribute of the <field> whose <name> matches
+; fieldName exactly, leaving its length untouched.
+TN_XmlSetFieldStart(xml, fieldName, newStart) {
+    pattern := '(<field type="\d+" start=")\d+("[^>]*><name>' fieldName '</name>)'
+    return RegExReplace(xml, pattern, "${1}" newStart "$2")
+}
+
+
+; Rewrites the start="..." attribute of the <range> that currently has
+; start="oldStart" (unique within the original template), leaving its
+; length untouched.
+TN_XmlSetRangeStart(xml, oldStart, newStart) {
+    pattern := '(<range type="\d+" start=")' oldStart '("[^>]*/>)'
+    return RegExReplace(xml, pattern, "${1}" newStart "$2")
+}
+
+
+; Removes a <field>...</field> block by name, and its corresponding
+; <range .../> (identified by its original, known start value), since
+; the field is being replaced by static embedded content instead.
+TN_XmlRemoveField(xml, fieldName, oldStart) {
+    xml := RegExReplace(xml, '<field type="\d+" start="\d+" length="\d+"[^>]*><name>' fieldName '</name>.*?</field>')
+    xml := RegExReplace(xml, '<range type="\d+" start="' oldStart '" length="\d+" */>')
+    return xml
+}
+
+
+; Applies the same "blank line around real nodules, no padding for the
+; default no-nodules sentence" rule used throughout the report. Shared by
+; TN_CopyReport (field defaultvalue text) and TN_BuildFindingsPlainText
+; (standalone findings text) so they can never drift apart.
+; trailingBlank: pass false when the template already supplies its own
+; blank-line separator right after this content (isthmus -- followed
+; immediately by "\cf1\par\par" before "Right thyroid:"). Leave true
+; (default) when nothing follows but the next field/line directly
+; (right/left nodules -- followed immediately by "Right nodes"/
+; "Left nodes" with no template-provided gap), where the trailing blank
+; is the only separator AND resets formatting after a bullet run.
+TN_FormatNoduleBlock(text, trailingBlank := true) {
     defaultText := "No significant nodules."
+    text := RTrim(text, "`r`n")
+    if (text = "")
+        return ""
+    if (text = defaultText)
+        return text "`n"           ; no extra blank lines for default text
+    return "`n" text (trailingBlank ? "`n" : "")   ; blank line before (& after, if trailingBlank) real nodules
+}
 
-    istText := RTrim(TN_IsthmusText, "`r`n")
-    rtText  := RTrim(TN_RightText,   "`r`n")
-    ltText  := RTrim(TN_LeftText,    "`r`n")
 
-    ; Isthmus
-    if (istText != "") {
-        if (istText = defaultText)
-            istField := istText             ; no extra blank lines for default text
-        else
-            istField := "`n" istText "`n"   ; blank line before & after real nodules
-    } else {
-        istField := ""
+; Pushes a formatted nodule block (see TN_FormatNoduleBlock) onto a line
+; array, one array element per line, for use with TN_BuildFindingsPlainText.
+TN_PushNoduleBlock(lines, text) {
+    block := TN_FormatNoduleBlock(text)
+    if (block = "")
+        return
+    for _, ln in StrSplit(RTrim(block, "`n"), "`n")
+        lines.Push(ln)
+}
+
+
+; Builds the resolved findings text using the exact section order and
+; wording that ends up in the pasted "Copy Text" report (matching
+; TN_RtfTemplate) -- so Copy Text and Copy Findings Only always say the
+; same thing.
+TN_BuildFindingsPlainText() {
+    global TN_IsthmusText, TN_RightText, TN_LeftText, TN_GuiObj
+
+    istThick := Trim(TN_GuiObj["TN_IsthmusThickness"].Value)
+    rightLen := Trim(TN_GuiObj["TN_RightLobeLength"].Value)
+    leftLen  := Trim(TN_GuiObj["TN_LeftLobeLength"].Value)
+
+    if (TN_IsthmusText = "" && TN_RightText = "" && TN_LeftText = "" && istThick = "" && rightLen = "" && leftLen = "")
+        return "(No selections made)"
+
+    lines := []
+    lines.Push("FINDINGS:")
+    lines.Push("")
+
+    lines.Push("Isthmus:")
+    if (istThick != "")
+        lines.Push(istThick " mm thick.")
+    TN_PushNoduleBlock(lines, TN_IsthmusText)
+
+    lines.Push("")
+    lines.Push("")
+
+    lines.Push("Right thyroid:")
+    if (rightLen != "")
+        lines.Push(rightLen " mm lobe length in sagittal plane.")
+    TN_PushNoduleBlock(lines, TN_RightText)
+    lines.Push("No right lymphadenopathy.")
+
+    lines.Push("")
+    lines.Push("")
+
+    lines.Push("Left thyroid:")
+    if (leftLen != "")
+        lines.Push(leftLen " mm lobe length in sagittal plane.")
+    TN_PushNoduleBlock(lines, TN_LeftText)
+    lines.Push("No left lymphadenopathy.")
+
+    txt := ""
+    for i, ln in lines
+        txt .= (i = 1 ? "" : "`n") ln
+
+    return txt
+}
+
+
+; Same mechanism as TN_CopyReport (real \pntext bullets embedded in body,
+; live PS360 fields for length/nodes/parathyroid, offsets recomputed)
+; but truncated right after "parathyroid" -- drops IMPRESSION,
+; RECOMMENDATIONS, Verbal Prelim, and the Glossary text entirely, so this
+; can overwrite just the findings of an already-dictated report without
+; touching its existing impression.
+TN_CopyFindingsOnly(*) {
+    global TN_GuiObj
+    global TN_RtfTemplate
+    global TN_IsthmusText, TN_RightText, TN_LeftText
+
+    plain := TN_BuildFindingsPlainText()
+
+    splitPos := InStr(TN_RtfTemplate, " {\xml}")
+    rtfBody := SubStr(TN_RtfTemplate, 1, splitPos - 1)
+    xmlPart := SubStr(TN_RtfTemplate, splitPos + 7)
+
+    istThick := Trim(TN_GuiObj["TN_IsthmusThickness"].Value)
+    rightLen := Trim(TN_GuiObj["TN_RightLobeLength"].Value)
+    leftLen  := Trim(TN_GuiObj["TN_LeftLobeLength"].Value)
+
+    xmlPart := TN_XmlSetDefault(xmlPart, "isthmus", istThick != "" ? istThick " mm" : "")
+    xmlPart := TN_XmlSetDefault(xmlPart, "right",   rightLen != "" ? rightLen " mm" : "")
+    xmlPart := TN_XmlSetDefault(xmlPart, "left",    leftLen  != "" ? leftLen  " mm" : "")
+
+    istFrag := TN_RtfParagraphsFromPlain(TN_FormatNoduleBlock(TN_IsthmusText, false))
+    rtFrag  := TN_RtfParagraphsFromPlain(TN_FormatNoduleBlock(TN_RightText))
+    ltFrag  := TN_RtfParagraphsFromPlain(TN_FormatNoduleBlock(TN_LeftText))
+
+    rtfBody := StrReplace(rtfBody, "isthmus nodules\par", istFrag)
+    rtfBody := StrReplace(rtfBody, "right nodules\par",   rtFrag)
+    rtfBody := StrReplace(rtfBody, "left nodules\par",    ltFrag)
+
+    xmlPart := TN_XmlRemoveField(xmlPart, "isthmus nodules", 35)
+    xmlPart := TN_XmlRemoveField(xmlPart, "right nodules",   105)
+    xmlPart := TN_XmlRemoveField(xmlPart, "left nodules",    183)
+
+    ; Cut the body right after "parathyroid" -- everything from IMPRESSION
+    ; onward (including the Glossary text) is dropped.
+    cutMarker := "\cf2 parathyroid\cf1 :none/parathyroid\cf2\par"
+    cutPos := InStr(rtfBody, cutMarker)
+    rtfBody := SubStr(rtfBody, 1, cutPos + StrLen(cutMarker) - 1) "`n}`n"
+
+    xmlPart := TN_XmlRemoveField(xmlPart, "IMPRESSION",       251)
+    xmlPart := TN_XmlRemoveField(xmlPart, "RECOMMENDATIONS:", 470)
+    xmlPart := TN_XmlRemoveField(xmlPart, "Verbal Prelim",    487)
+    xmlPart := RegExReplace(xmlPart, "<links>.*?</links>")  ; Glossary link, now gone
+
+    plainProjection := TN_RtfToPlain(rtfBody)
+    cursor := 1
+
+    fieldAnchors := [
+        ["isthmus", "isthmus", 20],
+        ["right", "right lobe length", 68],
+        ["Right nodes", "Right nodes", 119],
+        ["left", "left lobe length", 147],
+        ["Left nodes", "Left nodes", 196],
+        ["parathyroid", "parathyroid:none/parathyroid", 209],
+    ]
+
+    for _, entry in fieldAnchors {
+        fieldName := entry[1], anchor := entry[2], oldStart := entry[3]
+        newStart := TN_FindAnchor(plainProjection, anchor, &cursor)
+        xmlPart := TN_XmlSetFieldStart(xmlPart, fieldName, newStart)
+        xmlPart := TN_XmlSetRangeStart(xmlPart, oldStart, newStart)
     }
 
-    ; Right
-    if (rtText != "") {
-        if (rtText = defaultText)
-            rtField := rtText
-        else
-            rtField := "`n" rtText "`n"
-    } else {
-        rtField := ""
-    }
-
-    ; Left
-    if (ltText != "") {
-        if (ltText = defaultText)
-            ltField := ltText
-        else
-            ltField := "`n" ltText "`n"
-    } else {
-        ltField := ""
-    }
-
-    rtf := TN_XmlSetDefault(rtf, "isthmus nodules", istField)
-    rtf := TN_XmlSetDefault(rtf, "right nodules",   rtField)
-    rtf := TN_XmlSetDefault(rtf, "left nodules",    ltField)
-
-    ; ------------------------------------------------------------
-    ; 3) Put both plain text AND full RTF (with updated defaults) on clipboard
-    ; ------------------------------------------------------------
+    rtf := rtfBody " {\xml}" xmlPart
     TN_SetClipboardTextAndRTF(plain, rtf)
 }
 
@@ -2396,49 +2726,77 @@ TN_RtfEscape(str) {
     return str
 }
 
-TN_BuildRTF(plain) {
-    ; used to be lines starting with "Â·<TAB>" become list-style bullet paragraphs
-    ; Non-bullet lines (including blanks) explicitly reset paragraph formatting
-    ; so the list does not "spill over" between nodules.
-	; note that I am changing to this character: *
+; Converts plain text (bullet lines prefixed "* ") into an RTF paragraph
+; FRAGMENT -- no {\rtf1...} wrapper -- using the same bullet-list
+; structure PS360 itself produces: the {\*\pn...} list definition is
+; only emitted on the FIRST bullet of a run; consecutive bullets just
+; reuse {\pntext\f1\'B7\tab}. A blank line or normal line closes any
+; open list with \pard. If the fragment ends while still inside a
+; bullet run, it's closed at the end too, so whatever follows (when this
+; is embedded mid-document) isn't left with hanging-indent formatting.
+; Used by TN_CopyReport and TN_CopyFindingsOnly to embed nodule bullets
+; directly in the body.
+TN_RtfParagraphsFromPlain(plain) {
+    if (plain = "")
+        return ""
 
     lines := StrSplit(plain, "`n", "`r")
-
-    rtf  := "{\rtf1\ansi\deff0"
-    ; f0 = body font, f1 = Symbol for bullets
-    rtf .= "{\fonttbl{\f0 Segoe UI;}{\f1\fnil\fcharset2 Symbol;}}"
-    rtf .= "\viewkind4\uc1" . "`n"
+    rtf := ""
+    inList := false
 
     for index, line in lines {
         line := RTrim(line, "`r")
 
-        ; Blank line: ensure we are NOT in a list
+        ; Blank line: close any open list, then a bare paragraph break
         if (line = "") {
-            ; reset formatting, then plain blank paragraph
-            rtf .= "\pard\plain\par" . "`n"
+            if (inList) {
+                rtf .= "\pard\par" . "`n"
+                inList := false
+            } else {
+                rtf .= "\par" . "`n"
+            }
             continue
         }
 
-        ; Bullet-style paragraph: Bullet (was middot) + TAB prefix in plain text
-        if (SubStr(line, 1, 2) = "*`t") {
-            ; Strip "*<TAB>"
+        ; Bold section header
+        if (line = "FINDINGS:") {
+            if (inList) {
+                rtf .= "\pard\par" . "`n"
+                inList := false
+            }
+            rtf .= "\b FINDINGS:\b0\par" . "`n"
+            continue
+        }
+
+        ; Bullet line: "* " prefix (matches TN_UpdateDisplay's `bullet := "* "`)
+        if (SubStr(line, 1, 2) = "* ") {
             text := SubStr(line, 3)
             textEsc := TN_RtfEscape(text)
 
-            ; List-style bullet paragraph:
-            ; \pard{\pntext\f1\'B7\tab}{\*\pn\pnlvlblt\pnf1\pnindent0{\pntxtb\'B7}}\fi-360\li360 <text>\par
-            rtf .= "\pard"
-            rtf .= "{\pntext\f1\'B7\tab}"
-            rtf .= "{\*\pn\pnlvlblt\pnf1\pnindent0{\pntxtb\'B7}}"
-            rtf .= "\fi-360\li360 " textEsc "\par" . "`n"
+            if (!inList) {
+                ; First bullet of a run: full list definition
+                rtf .= "\pard{\pntext\f1\'B7\tab}{\*\pn\pnlvlblt\pnf1\pnindent0{\pntxtb\'B7}}\fi-360\li360 " textEsc "\par" . "`n"
+                inList := true
+            } else {
+                ; Continuation bullet: reuse the run's list formatting
+                rtf .= "{\pntext\f1\'B7\tab}" textEsc "\par" . "`n"
+            }
+            continue
+        }
+
+        ; Normal paragraph
+        if (inList) {
+            rtf .= "\pard " TN_RtfEscape(line) "\par" . "`n"
+            inList := false
         } else {
-            ; Normal paragraph: reset formatting so it's not part of the list
-            textEsc := TN_RtfEscape(line)
-            rtf .= "\pard\plain\f0 " textEsc "\par" . "`n"
+            rtf .= TN_RtfEscape(line) "\par" . "`n"
         }
     }
 
-    rtf .= "}"
+    ; Safety net: close a list left open at the very end of the fragment
+    if (inList)
+        rtf .= "\pard" . "`n"
+
     return rtf
 }
 
