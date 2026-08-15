@@ -1462,7 +1462,7 @@ LT_StripTrailingPeriod(s) {
     return s
 }
 
-LT_BuildOutput() {
+LT_BuildLines() {
     global LT_DeviceOrder, LT_InstanceOrder, LT_Instances, LT_DeviceDefs
 
     lines := []
@@ -1506,11 +1506,21 @@ LT_BuildOutput() {
     if (removalNouns.Length > 0)
         lines.Push(LT_StripTrailingPeriod(LT_JoinRemovalSentence(removalNouns)))
 
+    return lines
+}
+
+; Plain-text clipboard format: newline-joined, with a leading blank line so
+; pasting somewhere that only takes plain text can still start its own list.
+LT_JoinLinesPlain(lines) {
     out := ""
     for line in lines
         out .= line "`n"
     out := RTrim(out, "`n")
     return "`n" out
+}
+
+LT_BuildOutput() {
+    return LT_JoinLinesPlain(LT_BuildLines())
 }
 
 
@@ -1748,12 +1758,105 @@ LT_ToggleCollapse(instId, *) {
     LT_RebuildMiddleColumn(instId)
 }
 
+; Escapes a plain-text line for safe inclusion in RTF: backslash and braces
+; are RTF-significant, and anything outside ASCII needs \uNNNN? escaping.
+LT_RtfEscape(s) {
+    out := ""
+    Loop Parse, s {
+        c := A_LoopField
+        code := Ord(c)
+        if (c = "\")
+            out .= "\\"
+        else if (c = "{")
+            out .= "\{"
+        else if (c = "}")
+            out .= "\}"
+        else if (code > 127)
+            out .= "\u" code "?"
+        else
+            out .= c
+    }
+    return out
+}
+
+; Builds each line as its own bulleted paragraph using RTF's \bullet control
+; word -- a semantic instruction telling the reader to draw its own bullet
+; glyph, not a literal typed character -- with a hanging indent so wrapped
+; continuation lines still align under the text rather than the bullet.
+LT_BuildBulletRTF(lines) {
+    ; Matched directly against real RTF captured from PowerScribe's own
+    ; editor (Riched20), not the Word-style {\listtable}/{\listoverridetable}
+    ; mechanism used earlier -- RichEdit uses the older, simpler \pn
+    ; destination group instead. It's defined once, on the first bullet
+    ; paragraph; every later bullet just repeats the {\pntext...} fallback
+    ; marker and inherits that paragraph's hanging indent, no \pard needed
+    ; per line.
+    header := "
+    (LTrim
+    {\rtf1\ansi\ansicpg1252\deff0\deflang1033
+    {\fonttbl{\f0\fswiss\fcharset0 Calibri;}{\f1\fnil\fcharset2 Symbol;}}
+    {\*\generator LinesAndTubes;}
+    \viewkind4\uc1\pard\f0\fs22
+    \pard\li0\fi0\par
+    )"
+
+    rtf := header
+    for i, line in lines {
+        if (i > 1)
+            rtf .= "\par"
+        if (i = 1)
+            rtf .= "\pard{\pntext\f1\'B7\tab}{\*\pn\pnlvlblt\pnf1\pnindent0{\pntxtb\'B7}}\fi-360\li360 " LT_RtfEscape(line)
+        else
+            rtf .= "{\pntext\f1\'B7\tab}" LT_RtfEscape(line)
+    }
+    rtf .= "}"
+    return rtf
+}
+
+; Same technique as TN_SetClipboardTextAndRTF / CTAP_SetClipboardTextAndRTF /
+; RTM_SetClipboardTextAndRTF elsewhere in RAHKET: writes both CF_UNICODETEXT
+; and the registered "Rich Text Format" clipboard format in one pass, so a
+; paste target uses whichever it understands (falls back to plain text if it
+; doesn't know RTF).
+LT_SetClipboardTextAndRTF(plain, rtf) {
+    if !DllCall("OpenClipboard", "ptr", 0, "int") {
+        MsgBox "Could not open clipboard."
+        return
+    }
+
+    DllCall("EmptyClipboard")
+
+    lenW := (StrLen(plain) + 1) * 2
+    hText := DllCall("GlobalAlloc", "uint", 0x2, "uptr", lenW, "ptr")
+    if (hText) {
+        pText := DllCall("GlobalLock", "ptr", hText, "ptr")
+        StrPut(plain, pText, "UTF-16")
+        DllCall("GlobalUnlock", "ptr", hText)
+        DllCall("SetClipboardData", "uint", 13, "ptr", hText)  ; CF_UNICODETEXT
+    }
+
+    cfRtf := DllCall("RegisterClipboardFormat", "str", "Rich Text Format", "uint")
+    lenA := StrLen(rtf) + 1
+    hRtf := DllCall("GlobalAlloc", "uint", 0x2, "uptr", lenA, "ptr")
+    if (hRtf) {
+        pRtf := DllCall("GlobalLock", "ptr", hRtf, "ptr")
+        StrPut(rtf, pRtf, "CP0")
+        DllCall("GlobalUnlock", "ptr", hRtf)
+        DllCall("SetClipboardData", "uint", cfRtf, "ptr", hRtf)
+    }
+
+    DllCall("CloseClipboard")
+}
+
 LT_CopyOutput(*) {
     if (LT_AnyInstanceNeedsSideWarning()) {
         MsgBox("Please select a side for all red devices.", "Missing side", 48)
         return
     }
-    A_Clipboard := LT_BuildOutput()
+    lines := LT_BuildLines()
+    plain := LT_JoinLinesPlain(lines)
+    rtf := LT_BuildBulletRTF(lines)
+    LT_SetClipboardTextAndRTF(plain, rtf)
     ToolTip("Copied to clipboard")
     SetTimer(() => ToolTip(), -1000)
 }
