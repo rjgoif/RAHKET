@@ -35,6 +35,9 @@
         { "sourceLabel": "Lymph Nodes", "outputField": "Lymph Nodes", "mode": "extract" },
         { "sourceLabel": "Pelvic Organs/Bladder", "outputField": "Pelvic", "mode": "extract" },
         { "sourceLabel": "Vessels", "outputField": "Vessels", "mode": "extract" },
-        { "sourceLabel": "Bones/Soft Tissues", "outputField": "Bones", "mode": "extract" }
+        { "sourceLabel": "Bones/Soft Tissues", "outputField": "Bones", "mode": "extract" },
+        { "_note": "impressionBlock: carries the source report's own IMPRESSION text forward into the party template's Impression field, rather than leaving it blank.",
+          "outputField": "Impression", "mode": "impressionBlock" },
+        { "outputField": "RECOMMENDATION", "mode": "recommendationBlock" }
     ]
 }

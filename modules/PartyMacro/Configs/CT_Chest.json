@@ -73,14 +73,17 @@
         { "sourceLabel": "Pleura", "outputField": "Pleura", "mode": "extract" },
         { "sourceLabel": "Mediastinum", "outputField": "Mediastinum", "mode": "extract" },
 
-        { "_note": "conditionalOmit: Coronary is a live picklist field in the template and is left untouched by default. Confirmed against your real QM logic -- scans the Mediastinum text specifically (not the whole report) for the word 'coronary', since that's exactly where coronary language lands when the HARM Coronary picklist is filled in and appended to the Mediastinum sentence during dictation. If found, the standalone Coronary field is stripped from the party output as redundant.",
+        { "_note": "conditionalOmit: Coronary is a live picklist field in the template and is left untouched by default. Scans the Mediastinum text specifically (not the whole report) for the word 'coronary', since that's exactly where coronary language lands when the HARM Coronary picklist is filled in and appended to the Mediastinum sentence during dictation. If found, the standalone Coronary field AND its own trailing paragraph break are removed (see PartyMacro_BuildFinalRtf's comment for how the \\par's offset contribution is handled).",
           "outputField": "Coronary", "mode": "conditionalOmit", "scanField": "Mediastinum", "scanWholeSource": false,
           "keywords": ["coronary"],
-          "rtfLineToRemove": "\\cf2 Coronary\\cf1 :none/mild/moderate/severe\\cf2\\par\r\n" },
+          "rtfContentToRemove": "\\cf2 Coronary\\cf1 :none/mild/moderate/severe\\cf2\\par\r\n" },
 
         { "sourceLabel": "Lymph Nodes", "outputField": "Nodes", "mode": "extract" },
         { "sourceLabel": "Upper Abdomen", "outputField": "Abdomen", "mode": "extract" },
         { "sourceLabel": "Chest Wall", "outputField": "Chest wall", "mode": "extract" },
-        { "sourceLabel": "Bones", "outputField": "Bones", "mode": "extract" }
+        { "sourceLabel": "Bones", "outputField": "Bones", "mode": "extract" },
+        { "_note": "impressionBlock: carries the source report's own IMPRESSION text forward into the party template's Impression field, rather than leaving it blank. Multi-bullet impressions (1. ... 2. ...) will show later bullet numbers as inline text rather than separate auto-numbered lines -- same \\par-avoidance tradeoff as multi-line findings sections.",
+          "outputField": "Impression", "mode": "impressionBlock" },
+        { "outputField": "RECOMMENDATION", "mode": "recommendationBlock" }
     ]
 }

@@ -300,14 +300,14 @@ PartyMacro_ProcessMeasurements(text, targetUnit) {
 }
 
 PartyMacro_MeasurementCallback(m, targetUnit) {
-    if (m.Value(1) != "") {
-        fromUnit := StrLower(m.Value(3))
-        a := PartyMacro_ConvertVal(m.Value(1) + 0, fromUnit, targetUnit)
-        b := PartyMacro_ConvertVal(m.Value(2) + 0, fromUnit, targetUnit)
+    if (m[1] != "") {
+        fromUnit := StrLower(m[3])
+        a := PartyMacro_ConvertVal(m[1] + 0, fromUnit, targetUnit)
+        b := PartyMacro_ConvertVal(m[2] + 0, fromUnit, targetUnit)
         return PartyMacro_FormatMeasurement(a, targetUnit) " x " PartyMacro_FormatMeasurement(b, targetUnit) " " targetUnit
     }
-    fromUnit := StrLower(m.Value(5))
-    a := PartyMacro_ConvertVal(m.Value(4) + 0, fromUnit, targetUnit)
+    fromUnit := StrLower(m[5])
+    a := PartyMacro_ConvertVal(m[4] + 0, fromUnit, targetUnit)
     return PartyMacro_FormatMeasurement(a, targetUnit) " " targetUnit
 }
 
@@ -319,7 +319,7 @@ PartyMacro_ExtractSection(sourceText, label) {
     needle := "im)^" PartyMacro_EscapeRegex(label) ":[ \t]*(.*)$"
     if !RegExMatch(sourceText, needle, &m)
         return ""
-    return { whole: m.Value(0), content: Trim(m.Value(1)) }
+    return { whole: m[0], content: Trim(m[1], " `t`r`n") }
 }
 
 ; sourceLabel in config may be a single string or an array of fallback
@@ -329,7 +329,7 @@ PartyMacro_ExtractSectionMulti(sourceText, labelOrList) {
     if (Type(labelOrList) = "Array") {
         for lbl in labelOrList {
             r := PartyMacro_ExtractSection(sourceText, lbl)
-            if (r != "" && Trim(r.content) != "")
+            if (r != "" && Trim(r.content, " `t`r`n") != "")
                 return r
         }
         return ""
@@ -360,7 +360,11 @@ PartyMacro_ReflowSection(text, threshold) {
 
 
 ; ---------------------------------------------------------------------------
-; Word-level diff (LCS) for the track-changes view
+; Two-level diff (sentence-first, then word-level within changed sentences)
+; for the track-changes view. Doing word-level LCS across a whole paragraph
+; at once is prone to nonsensical alignments when a word repeats (e.g. two
+; "Unchanged"s) -- diffing sentences first, and only descending to word
+; level for sentences that actually differ, avoids that.
 ; ---------------------------------------------------------------------------
 PartyMacro_SplitWords(text) {
     words := []
@@ -371,9 +375,29 @@ PartyMacro_SplitWords(text) {
     return words
 }
 
-PartyMacro_WordDiff(origText, finalText) {
-    a := PartyMacro_SplitWords(origText)
-    b := PartyMacro_SplitWords(finalText)
+; Splits text into sentences, keeping each sentence's own trailing
+; punctuation attached to it. Uses the same boundary regex as reflow.
+PartyMacro_SplitSentences(text) {
+    static splitRE := "(?<!\d\.)(?<=\d|[a-zA-Z])([\)\].!?]{1,2})\s+(?=[A-Z\d])"
+    sentences := []
+    pos := 1
+    lastEnd := 1
+    while (foundPos := RegExMatch(text, splitRE, &m, pos)) {
+        boundaryEnd := foundPos + m.Len(0)
+        sentences.Push(SubStr(text, lastEnd, foundPos + m.Len(1) - lastEnd))
+        lastEnd := boundaryEnd
+        pos := boundaryEnd
+        if (m.Len(0) = 0)
+            pos += 1
+    }
+    tail := SubStr(text, lastEnd)
+    if (Trim(tail, " `t`r`n") != "")
+        sentences.Push(tail)
+    return sentences
+}
+
+; Generic LCS diff over two arrays of string tokens (words or sentences)
+PartyMacro_TokenDiff(a, b) {
     n := a.Length, m := b.Length
 
     dp := []
@@ -395,13 +419,13 @@ PartyMacro_WordDiff(origText, finalText) {
     i := n, j := m
     while (i > 0 || j > 0) {
         if (i > 0 && j > 0 && a[i] = b[j]) {
-            ops.InsertAt(1, { type: "same", word: a[i] })
+            ops.InsertAt(1, { type: "same", token: a[i] })
             i--, j--
         } else if (j > 0 && (i = 0 || dp[i + 1][j] >= dp[i][j + 1])) {
-            ops.InsertAt(1, { type: "add", word: b[j] })
+            ops.InsertAt(1, { type: "add", token: b[j] })
             j--
         } else {
-            ops.InsertAt(1, { type: "del", word: a[i] })
+            ops.InsertAt(1, { type: "del", token: a[i] })
             i--
         }
     }
@@ -422,14 +446,15 @@ PartyMacro_HtmlEscape(s) {
     return s
 }
 
-PartyMacro_DiffToHtml(ops) {
+; Renders word-level ops (same/add/del) to HTML spans
+PartyMacro_WordOpsToHtml(ops) {
     html := ""
     for op in ops {
-        word := PartyMacro_HtmlEscape(op.word)
+        word := PartyMacro_HtmlEscape(op.token)
         if (op.type = "del") {
             html .= '<span class="del">' word '</span> '
         } else {
-            isSimilar := RegExMatch(op.word, "i)^similar")
+            isSimilar := RegExMatch(op.token, "i)^similar")
             cls := (op.type = "add") ? "add" : ""
             if (isSimilar)
                 cls := Trim(cls " similar")
@@ -438,6 +463,48 @@ PartyMacro_DiffToHtml(ops) {
             else
                 html .= word ' '
         }
+    }
+    return html
+}
+
+; Top-level entry point: sentence-level diff first; consecutive del+add
+; sentence pairs (i.e. a sentence that was modified, not removed/added
+; outright) get refined into a word-level diff scoped to just that pair.
+PartyMacro_TextDiffHtml(origText, finalText) {
+    sentA := PartyMacro_SplitSentences(origText)
+    sentB := PartyMacro_SplitSentences(finalText)
+    ops := PartyMacro_TokenDiff(sentA, sentB)
+
+    html := ""
+    idx := 1
+    while (idx <= ops.Length) {
+        op := ops[idx]
+
+        if (op.type = "same") {
+            html .= PartyMacro_HtmlEscape(op.token) " "
+            idx++
+            continue
+        }
+
+        ; a "del" immediately followed by an "add" is treated as one
+        ; modified sentence -- refine with a word-level diff scoped to
+        ; just that pair, instead of showing the whole sentence swapped
+        if (op.type = "del" && idx < ops.Length && ops[idx + 1].type = "add") {
+            wordOps := PartyMacro_TokenDiff(PartyMacro_SplitWords(op.token), PartyMacro_SplitWords(ops[idx + 1].token))
+            html .= PartyMacro_WordOpsToHtml(wordOps)
+            idx += 2
+            continue
+        }
+
+        if (op.type = "del") {
+            html .= '<span class="del">' PartyMacro_HtmlEscape(op.token) '</span> '
+            idx++
+            continue
+        }
+
+        ; add with no paired del -- a genuinely new sentence
+        html .= '<span class="add">' PartyMacro_HtmlEscape(op.token) '</span> '
+        idx++
     }
     return html
 }
@@ -462,6 +529,56 @@ PartyMacro_XmlSetDefault(rtf, fieldName, newVal) {
     newVal := PartyMacro_XmlEscape(newVal)
     pattern := "(<name>" PartyMacro_EscapeRegex(fieldName) "</name><defaultvalue>)(.*?)(</defaultvalue>)"
     return RegExReplace(rtf, pattern, "$1" newVal "$3")
+}
+
+; Parses every field's name/start/length from the pristine template XML, in
+; document order. The declared "length" always matches that field's actual
+; plain-text span (confirmed against real templates -- for picklist fields
+; like Coronary this includes trailing text like ":none/mild/moderate/severe",
+; not just the visible colored word).
+PartyMacro_ParseFieldPositions(rtf) {
+    fields := []
+    pos := 1
+    needle := 'field type="\d+" start="(\d+)" length="(\d+)"[^>]*><name>(.*?)</name>'
+    while (foundPos := RegExMatch(rtf, needle, &m, pos)) {
+        fields.Push({ name: m[3], start: m[1] + 0, length: m[2] + 0 })
+        pos := foundPos + m.Len(0)
+    }
+    return fields
+}
+
+; Updates just the start="" length="" attributes on one field's tag,
+; identified by its <name>
+PartyMacro_XmlSetFieldPosition(rtf, fieldName, newStart, newLength) {
+    pattern := '(<field type="\d+") start="\d+" length="\d+"([^>]*><name>' PartyMacro_EscapeRegex(fieldName) '</name>)'
+    replacement := '$1 start="' newStart '" length="' newLength '"$2'
+    return RegExReplace(rtf, pattern, replacement)
+}
+
+; Minimal RTF control-character escaping for inserted plain text. Embedded
+; line breaks become \line (a soft break within the same paragraph, not
+; \par which would start a new one) so multi-line content -- nodule lists,
+; merged continuation text -- actually renders as separate lines rather
+; than being flattened to spaces.
+PartyMacro_RtfEscape(s) {
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, "{", "\{")
+    s := StrReplace(s, "}", "\}")
+    s := StrReplace(s, "`r`n", "\line ")
+    s := StrReplace(s, "`n", "\line ")
+    return s
+}
+
+; This is what actually controls what PowerScribe displays on paste.
+; Most fields use "\cf2 Name\cf1" (e.g. "\cf2 Lines\cf1"), but some
+; (Impression, RECOMMENDATION) go straight to "\cf2 Name\par" with no
+; \cf1 at all -- confirmed against the real template. Matching whichever
+; terminator is actually present, instead of assuming \cf1 always exists,
+; is what makes Impression carry-forward actually work.
+PartyMacro_SetRtfFieldText(rtf, fieldName, newVal) {
+    pattern := "\\cf2 " PartyMacro_EscapeRegex(fieldName) "(\\cf1|\\par)"
+    replacement := "\cf2 " PartyMacro_RtfEscape(newVal) "$1"
+    return RegExReplace(rtf, pattern, replacement)
 }
 
 ; Strips a field's entire <field>...</field> block from the trailing XML,
@@ -516,6 +633,117 @@ PartyMacro_SetClipboardTextAndRTF(plain, rtf) {
 ; ---------------------------------------------------------------------------
 ; Core pipeline
 ; ---------------------------------------------------------------------------
+; Isolates the substring between "FINDINGS:" and "IMPRESSION:" (case
+; insensitive). TECHNIQUE/COMPARISON/indication text above it is expected
+; to not match any field.
+PartyMacro_ExtractFindingsBlock(sourceText) {
+    startPos := RegExMatch(sourceText, "i)FINDINGS:", &m1)
+    if !startPos
+        return sourceText
+    blockStart := startPos + m1.Len(0)
+    endPos := RegExMatch(sourceText, "i)IMPRESSION:", &m2, blockStart)
+    if !endPos
+        return SubStr(sourceText, blockStart)
+    return SubStr(sourceText, blockStart, endPos - blockStart)
+}
+
+; Isolates the IMPRESSION block: from right after "IMPRESSION:" to right
+; before "RECOMMENDATION:"/"RECOMMENDATIONS:" (or end of text if neither
+; is present).
+PartyMacro_ExtractImpressionBlock(sourceText) {
+    startPos := RegExMatch(sourceText, "i)IMPRESSION:", &m1)
+    if !startPos
+        return ""
+    blockStart := startPos + m1.Len(0)
+    endPos := RegExMatch(sourceText, "i)RECOMMENDATIONS?:", &m2, blockStart)
+    block := endPos ? SubStr(sourceText, blockStart, endPos - blockStart) : SubStr(sourceText, blockStart)
+    return Trim(block, " `t`r`n")
+}
+
+; Isolates the RECOMMENDATION block: from right after "RECOMMENDATION:" or
+; "RECOMMENDATIONS:" to the end of the text (no further section marker to
+; bound it against currently -- if reports commonly have something after
+; it, that boundary would need adding).
+PartyMacro_ExtractRecommendationBlock(sourceText) {
+    startPos := RegExMatch(sourceText, "i)RECOMMENDATIONS?:", &m1)
+    if !startPos
+        return ""
+    blockStart := startPos + m1.Len(0)
+    return Trim(SubStr(sourceText, blockStart), " `t`r`n")
+}
+
+; Builds a regex alternation of every known extract-mode source label,
+; used to find where one field's span ends and the next begins.
+PartyMacro_BuildLabelAlternation(config) {
+    parts := []
+    for sec in config["sections"] {
+        if (sec["mode"] != "extract")
+            continue
+        if (Type(sec["sourceLabel"]) = "Array") {
+            for lbl in sec["sourceLabel"]
+                parts.Push(PartyMacro_EscapeRegex(lbl))
+        } else {
+            parts.Push(PartyMacro_EscapeRegex(sec["sourceLabel"]))
+        }
+    }
+    alt := ""
+    for idx, p in parts
+        alt .= (idx = 1 ? "" : "|") p
+    return alt
+}
+
+; Extracts a field's full multi-line span: everything from right after
+; "Label:" up to (not including) the next recognized label-starting-line,
+; or the end of the findings block. This is the key change that makes
+; continuation lines -- list items, stray unlabeled notes, etc. -- belong
+; to the preceding field automatically, instead of needing separate
+; "orphan" handling: they were never actually separate, they're just text
+; that comes after a label and before the next one.
+PartyMacro_ExtractFieldSpan(findingsBlock, label, labelAlternation) {
+    myPattern := "im)^" PartyMacro_EscapeRegex(label) ":[ \t]*"
+    foundPos := RegExMatch(findingsBlock, myPattern, &m)
+    if !foundPos
+        return ""
+    contentStart := foundPos + m.Len(0)
+
+    nextPattern := "im)^(?:" labelAlternation "):"
+    nextPos := RegExMatch(findingsBlock, nextPattern, &m2, contentStart)
+    spanEnd := nextPos ? nextPos : StrLen(findingsBlock) + 1
+
+    return Trim(SubStr(findingsBlock, contentStart, spanEnd - contentStart), " `t`r`n")
+}
+
+PartyMacro_ExtractFieldSpanMulti(findingsBlock, labelOrList, labelAlternation) {
+    if (Type(labelOrList) = "Array") {
+        for lbl in labelOrList {
+            r := PartyMacro_ExtractFieldSpan(findingsBlock, lbl, labelAlternation)
+            if (r != "")
+                return r
+        }
+        return ""
+    }
+    return PartyMacro_ExtractFieldSpan(findingsBlock, labelOrList, labelAlternation)
+}
+
+; Text before the FIRST recognized field has no preceding field to belong
+; to -- that's the only case still surfaced as genuinely orphaned.
+PartyMacro_ExtractLeadingOrphan(findingsBlock, labelAlternation) {
+    pattern := "im)^(?:" labelAlternation "):"
+    foundPos := RegExMatch(findingsBlock, pattern, &m)
+    if !foundPos
+        return Trim(findingsBlock, " `t`r`n")
+    return Trim(SubStr(findingsBlock, 1, foundPos - 1), " `t`r`n")
+}
+
+; The RTF value keeps embedded line breaks now (PartyMacro_RtfEscape turns
+; them into \line when inserted into the RTF body) rather than flattening
+; to spaces. StrLen() already counts each embedded \n as exactly 1
+; character, which is what the offset math needs to stay consistent with
+; the same 1-character-per-break assumption used for Coronary's \par.
+PartyMacro_NormalizeForRtf(text) {
+    return Trim(RegExReplace(text, " {2,}", " "), " `t`r`n")
+}
+
 PartyMacro_Process(sourceText, config, universalRules) {
     targetUnit := config.Has("measurementUnit") ? config["measurementUnit"] : "cm"
     threshold  := config.Has("reflowThreshold") ? config["reflowThreshold"] : 3
@@ -528,88 +756,141 @@ PartyMacro_Process(sourceText, config, universalRules) {
             allRules.Push(r)
     }
 
-    ; Pass 1: extract + clean all "extract" mode sections
-    fieldText := Map()      ; outputField -> final cleaned text
-    sectionResults := []    ; for diff display, in config order
+    findingsBlock := PartyMacro_ExtractFindingsBlock(sourceText)
+    labelAlternation := PartyMacro_BuildLabelAlternation(config)
 
+    fieldText := Map()      ; outputField -> RTF-safe value (for scan lookups + RTF building)
+    fieldOrder := []        ; [{field, value}] RTF-safe values, in config order
+    plainOrder := []        ; [{field, value}] plain values (line breaks preserved), in config order
+    sectionResults := []    ; diff display, in config order
+    rtfRemovalMap := Map()
+
+    ; Single pass through sections in config order, handling every mode
+    ; inline -- this is what keeps the diff view in the same order as the
+    ; template (e.g. Coronary right after Mediastinum) instead of grouped
+    ; by mode.
     for sec in config["sections"] {
-        if (sec["mode"] != "extract")
-            continue
+        mode := sec["mode"]
 
-        extracted := PartyMacro_ExtractSectionMulti(sourceText, sec["sourceLabel"])
-        if (extracted = "") {
-            sectionResults.Push({ label: sec["outputField"], found: false, diffHtml: "", flag: "" })
-            continue
-        }
+        if (mode = "extract") {
+            spanText := PartyMacro_ExtractFieldSpanMulti(findingsBlock, sec["sourceLabel"], labelAlternation)
+            if (spanText = "") {
+                sectionResults.Push({ label: sec["outputField"], found: false, diffHtml: "", flag: "" })
+                continue
+            }
 
-        cleaned := PartyMacro_ApplyCleanupRules(extracted.content, allRules)
-        cleaned := PartyMacro_ProcessMeasurements(cleaned, targetUnit)
-        cleaned := Trim(RegExReplace(cleaned, " {2,}", " "))
-        reflowed := PartyMacro_ReflowSection(cleaned, threshold)
+            cleaned := PartyMacro_ApplyCleanupRules(spanText, allRules)
+            cleaned := PartyMacro_ProcessMeasurements(cleaned, targetUnit)
+            cleaned := RegExReplace(cleaned, " {2,}", " ")
+            cleaned := RegExReplace(cleaned, "(?:[ \t]*\r?\n){3,}", "`n`n")
+            cleaned := Trim(cleaned, " `t`r`n")
+            reflowed := PartyMacro_ReflowSection(cleaned, threshold)
 
-        fieldText[sec["outputField"]] := StrReplace(reflowed, "`n", " ")
+            plainVal := reflowed
+            rtfVal := PartyMacro_NormalizeForRtf(reflowed)
 
-        diffOps := PartyMacro_WordDiff(extracted.content, reflowed)
-        sectionResults.Push({ label: sec["outputField"], found: true, diffHtml: PartyMacro_DiffToHtml(diffOps), flag: "" })
-    }
+            fieldText[sec["outputField"]] := rtfVal
+            fieldOrder.Push({ field: sec["outputField"], value: rtfVal })
+            plainOrder.Push({ field: sec["outputField"], value: plainVal })
 
-    ; Pass 2: keywordScan sections (e.g. Stones) -- flag only, don't overwrite
-    for sec in config["sections"] {
-        if (sec["mode"] != "keywordScan")
-            continue
+            diffHtml := PartyMacro_TextDiffHtml(spanText, reflowed)
+            sectionResults.Push({ label: sec["outputField"], found: true, diffHtml: diffHtml, flag: "" })
 
-        scanText := fieldText.Has(sec["scanField"]) ? fieldText[sec["scanField"]] : ""
-        hit := ""
-        for kw in sec["keywords"] {
-            if RegExMatch(scanText, "i)\b" kw) {
-                hit := kw
-                break
+        } else if (mode = "impressionBlock") {
+            impText := PartyMacro_ExtractImpressionBlock(sourceText)
+            if (impText = "") {
+                sectionResults.Push({ label: sec["outputField"], found: false, diffHtml: "", flag: "" })
+                continue
+            }
+
+            ; strip a leading "1." / "1.\t" -- the template's own
+            ; auto-numbering already provides that for the first bullet
+            impText := RegExReplace(impText, "^\s*\d+\.\s*", "")
+
+            cleaned := PartyMacro_ApplyCleanupRules(impText, allRules)
+            cleaned := PartyMacro_ProcessMeasurements(cleaned, targetUnit)
+            cleaned := Trim(RegExReplace(cleaned, " {2,}", " "), " `t`r`n")
+
+            plainVal := cleaned
+            rtfVal := PartyMacro_NormalizeForRtf(cleaned)
+
+            fieldText[sec["outputField"]] := rtfVal
+            fieldOrder.Push({ field: sec["outputField"], value: rtfVal })
+            plainOrder.Push({ field: sec["outputField"], value: plainVal })
+
+            diffHtml := PartyMacro_TextDiffHtml(impText, cleaned)
+            sectionResults.Push({ label: sec["outputField"], found: true, diffHtml: diffHtml, flag: "" })
+
+        } else if (mode = "recommendationBlock") {
+            recText := PartyMacro_ExtractRecommendationBlock(sourceText)
+            if (recText = "") {
+                sectionResults.Push({ label: sec["outputField"], found: false, diffHtml: "", flag: "" })
+                continue
+            }
+
+            cleaned := PartyMacro_ApplyCleanupRules(recText, allRules)
+            cleaned := PartyMacro_ProcessMeasurements(cleaned, targetUnit)
+            cleaned := Trim(RegExReplace(cleaned, " {2,}", " "), " `t`r`n")
+
+            plainVal := cleaned
+            rtfVal := PartyMacro_NormalizeForRtf(cleaned)
+
+            fieldText[sec["outputField"]] := rtfVal
+            fieldOrder.Push({ field: sec["outputField"], value: rtfVal })
+            plainOrder.Push({ field: sec["outputField"], value: plainVal })
+
+            diffHtml := PartyMacro_TextDiffHtml(recText, cleaned)
+            sectionResults.Push({ label: sec["outputField"], found: true, diffHtml: diffHtml, flag: "" })
+
+        } else if (mode = "keywordScan") {
+            scanText := fieldText.Has(sec["scanField"]) ? fieldText[sec["scanField"]] : ""
+            hit := ""
+            for kw in sec["keywords"] {
+                if RegExMatch(scanText, "i)\b" kw) {
+                    hit := kw
+                    break
+                }
+            }
+            if (hit != "") {
+                sectionResults.Push({ label: sec["outputField"], found: true,
+                    diffHtml: '<span class="flag">Possible ' PartyMacro_HtmlEscape(sec["outputField"]) '-related language ("' PartyMacro_HtmlEscape(hit) '") found in ' sec["scanField"] ' -- review and move manually. Field left at template default.</span>',
+                    flag: hit })
+            } else {
+                sectionResults.Push({ label: sec["outputField"], found: true,
+                    diffHtml: '<span class="missing">(no ' PartyMacro_HtmlEscape(sec["outputField"]) '-related language detected -- left at template default)</span>', flag: "" })
+            }
+
+        } else if (mode = "conditionalOmit") {
+            scanText := (sec.Has("scanWholeSource") && sec["scanWholeSource"])
+                ? sourceText
+                : (fieldText.Has(sec["scanField"]) ? fieldText[sec["scanField"]] : "")
+
+            hit := ""
+            for kw in sec["keywords"] {
+                if InStr(scanText, kw) {
+                    hit := kw
+                    break
+                }
+            }
+
+            if (hit != "" && sec.Has("rtfContentToRemove")) {
+                rtfRemovalMap[sec["outputField"]] := sec["rtfContentToRemove"]
+                sectionResults.Push({ label: sec["outputField"], found: true,
+                    diffHtml: '<span class="flag">"' PartyMacro_HtmlEscape(hit) '" found in report -- field removed from party output.</span>' })
+            } else if (hit != "") {
+                sectionResults.Push({ label: sec["outputField"], found: true,
+                    diffHtml: '<span class="flag">"' PartyMacro_HtmlEscape(hit) '" found in report -- review and remove/edit this field manually in PowerScribe (left untouched here).</span>' })
+            } else {
+                sectionResults.Push({ label: sec["outputField"], found: true,
+                    diffHtml: '<span class="missing">(no matching language found -- field kept as-is, untouched)</span>' })
             }
         }
-
-        if (hit != "") {
-            sectionResults.Push({ label: sec["outputField"], found: true,
-                diffHtml: '<span class="flag">Possible ' PartyMacro_HtmlEscape(sec["outputField"]) '-related language ("' PartyMacro_HtmlEscape(hit) '") found in ' sec["scanField"] ' -- review and move manually. Field left at template default.</span>',
-                flag: hit })
-        } else {
-            sectionResults.Push({ label: sec["outputField"], found: true,
-                diffHtml: '<span class="missing">(no ' PartyMacro_HtmlEscape(sec["outputField"]) '-related language detected -- left at template default)</span>', flag: "" })
-        }
-        ; not written to fieldText -- template default stays in the RTF
     }
 
-    ; Pass 3: conditionalOmit sections (e.g. Coronary) -- if keywords are
-    ; found, the field gets stripped entirely at copy time. If not found,
-    ; nothing happens: the field is simply never touched, so it stays in
-    ; the output as its original live picklist/default.
-    omitFields := []
-    for sec in config["sections"] {
-        if (sec["mode"] != "conditionalOmit")
-            continue
+    orphanText := PartyMacro_ExtractLeadingOrphan(findingsBlock, labelAlternation)
 
-        scanText := (sec.Has("scanWholeSource") && sec["scanWholeSource"])
-            ? sourceText
-            : (fieldText.Has(sec["scanField"]) ? fieldText[sec["scanField"]] : "")
-
-        hit := ""
-        for kw in sec["keywords"] {
-            if InStr(scanText, kw) {
-                hit := kw
-                break
-            }
-        }
-
-        if (hit != "") {
-            omitFields.Push({ outputField: sec["outputField"], rtfLine: sec["rtfLineToRemove"] })
-            sectionResults.Push({ label: sec["outputField"], found: true,
-                diffHtml: '<span class="flag">"' PartyMacro_HtmlEscape(hit) '" found in report -- field omitted from party output.</span>' })
-        } else {
-            sectionResults.Push({ label: sec["outputField"], found: true,
-                diffHtml: '<span class="missing">(no matching language found -- field kept as-is, untouched)</span>' })
-        }
-    }
-
-    return { fieldText: fieldText, sections: sectionResults, omitFields: omitFields }
+    return { fieldText: fieldText, fieldOrder: fieldOrder, plainOrder: plainOrder,
+             sections: sectionResults, orphanText: orphanText, rtfRemovalMap: rtfRemovalMap }
 }
 
 
@@ -625,7 +906,13 @@ PartyMacro_BuildDiffDocument(result) {
         . '.similar{background:#fff3b0;}'
         . '.flag{background:#ffd9a0;border:1px solid #cc8400;padding:2px 4px;}'
         . '.missing{color:#888;font-style:italic;}'
+        . '.orphan{background:#ffe0e0;border:2px solid #b00020;padding:8px;white-space:pre-wrap;}'
         . '</style></head><body>'
+
+    if (result.orphanText != "") {
+        html .= '<h4 style="color:#b00020;">Unmatched text before the first recognized field -- no preceding field to attach to, add manually</h4>'
+        html .= '<div class="orphan">' PartyMacro_HtmlEscape(result.orphanText) '</div>'
+    }
 
     for r in result.sections {
         html .= '<h4>' PartyMacro_HtmlEscape(r.label) '</h4>'
@@ -796,6 +1083,55 @@ PartyMacro_ChooserConfirm(cGui, candidates, lb, sourceText, universalRules, webC
     PartyMacro_RunPipeline(entry, sourceText, universalRules, webCtrl, statusText)
 }
 
+; Builds the final RTF+XML from the pristine template: edits the visible
+; RTF body text for each field, AND recomputes every field's start/length
+; XML offsets cascading through the document, so fields after the first
+; edited one still land in the right place. This is required -- editing
+; only the visible text left every later field's offset stale, since
+; PowerScribe uses those offsets (not just the visible span) to carve up
+; the pasted plain text on paste.
+;
+; rtfRemovalMap (fieldName -> literal RTF content) is for fields being
+; fully removed (e.g. Coronary): the exact content span is stripped
+; directly, plus its own trailing \par (to avoid leaving a blank line
+; behind). The content span's length is verified against the field's
+; declared XML length. The \par's contribution to PowerScribe's plain-text
+; offset count is NOT independently verified -- it's inferred from
+; comparing "par removed" (corrupted every later field) against "par
+; preserved" (worked correctly) in actual testing, which points to
+; exactly 1 character. Worth specifically re-checking that fields after a
+; removed one still land correctly.
+PartyMacro_BuildFinalRtf(templateRtf, valueMap, rtfRemovalMap) {
+    fields := PartyMacro_ParseFieldPositions(templateRtf)
+
+    rtf := templateRtf
+    cumulativeDelta := 0
+
+    for f in fields {
+        newStart := f.start + cumulativeDelta
+
+        if rtfRemovalMap.Has(f.name) {
+            rtf := StrReplace(rtf, rtfRemovalMap[f.name], "")
+            rtf := PartyMacro_RemoveXmlField(rtf, f.name)
+            cumulativeDelta += -(f.length + 1)
+        } else if valueMap.Has(f.name) {
+            newVal := valueMap[f.name]
+            newLen := StrLen(newVal)
+            rtf := PartyMacro_SetRtfFieldText(rtf, f.name, newVal)
+            rtf := PartyMacro_XmlSetDefault(rtf, f.name, newVal)
+            rtf := PartyMacro_XmlSetFieldPosition(rtf, f.name, newStart, newLen)
+            cumulativeDelta += newLen - f.length
+        } else {
+            ; untouched field (Coronary when kept, RECOMMENDATION) --
+            ; still needs its start shifted if any earlier field's
+            ; length changed
+            rtf := PartyMacro_XmlSetFieldPosition(rtf, f.name, newStart, f.length)
+        }
+    }
+
+    return rtf
+}
+
 PartyMacro_OnCopy(configList, ddl, statusText) {
     global PartyMacro_LastResult, PartyMacro_LastTemplateRtf
 
@@ -804,16 +1140,19 @@ PartyMacro_OnCopy(configList, ddl, statusText) {
         return
     }
 
-    rtf := PartyMacro_LastTemplateRtf
+    valueMap := Map()
+    for pair in PartyMacro_LastResult.fieldOrder
+        valueMap[pair.field] := pair.value
+
+    rtf := PartyMacro_BuildFinalRtf(PartyMacro_LastTemplateRtf, valueMap, PartyMacro_LastResult.rtfRemovalMap)
+
     plainParts := []
-    for fieldName, val in PartyMacro_LastResult.fieldText {
-        rtf := PartyMacro_XmlSetDefault(rtf, fieldName, val)
-        plainParts.Push(fieldName ": " val)
+    for pair in PartyMacro_LastResult.plainOrder {
+        if (pair.value != "")
+            plainParts.Push(pair.field ": " pair.value)
     }
-    for omit in PartyMacro_LastResult.omitFields {
-        rtf := PartyMacro_RemoveXmlField(rtf, omit.outputField)
-        rtf := PartyMacro_RemoveRtfLine(rtf, omit.rtfLine)
-    }
+    if (PartyMacro_LastResult.orphanText != "")
+        plainParts.Push("--- UNMATCHED TEXT (no preceding field to attach to -- add manually) ---`n" PartyMacro_LastResult.orphanText)
     plain := ""
     for idx, part in plainParts
         plain .= (idx = 1 ? "" : "`n") part

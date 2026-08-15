@@ -195,8 +195,8 @@
                 { "type": "regex", "find": "\\b(November)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Nov-$3" },
                 { "type": "regex", "find": "\\b(December)\\s+(\\d{1,2}),?\\s+?(\\d{4})\\b", "replace": "$2-Dec-$3" },
 
-                { "type": "regex", "find": "[\\d]{1}-[A-Z][a-z]{2}-[\\d]{4}", "replace": "0$0" },
-                { "type": "regex", "find": "([\\d]{2})-([A-Z][a-z]{2})-([\\d]{4})", "replace": "$3-$2-$1" }
+                { "type": "regex", "find": "(?<!\\d)[\\d]{1}-[A-Z][a-z]{2}-[\\d]{4}", "replace": "0$0" },
+                { "type": "regex", "find": "(?<!\\d)([\\d]{2})-([A-Z][a-z]{2})-([\\d]{4})", "replace": "$3-$2-$1" }
             ]
         },
         {
