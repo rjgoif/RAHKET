@@ -142,6 +142,7 @@ for LT_Cat_ in LT_DeviceCategories {
 OnMessage(0x20A, LT_OnMouseWheel)  ; WM_MOUSEWHEEL
 OnMessage(0x115, LT_OnVScroll)     ; WM_VSCROLL
 OnMessage(0x0003, LT_OnImageMove)  ; WM_MOVE (filtered to the image popup window; tracks its position for the session)
+OnMessage(0x0214, LT_OnImageSizing)  ; WM_SIZING (filtered to the image popup window; enforces its aspect ratio live during drag)
 
 ; ============================================================================
 ; SHARED ANATOMIC LOCATION GROUPS
@@ -961,7 +962,7 @@ LT_BuildDeviceDefs() {
             Map("id", "crossingValve", "type", "toggle", "label", "Crossing the aortic valve plane")
         ],
         "sentenceFn", LT_Sentence_Impella,
-        "removalNoun", (fields) => Map("text", "Impella left ventricular assist device", "plural", false)
+        "removalNoun", (fields) => Map("text", "Impella left ventricular assist device (LVAD)", "plural", false)
     )
 
     defs["LVAD"] := Map(
@@ -972,7 +973,7 @@ LT_BuildDeviceDefs() {
                 "options", ["HeartMate 3", "HVAD"])
         ],
         "sentenceFn", LT_Sentence_LVAD,
-        "removalNoun", (fields) => Map("text", "left ventricular assist device", "plural", false)
+        "removalNoun", (fields) => Map("text", "left ventricular assist device (LVAD)", "plural", false)
     )
 
     defs["PADS"] := Map(
@@ -1505,7 +1506,7 @@ LT_Sentence_Impella(fields) {
     crossing := fields.Get("crossingValve", false)
 
     approachText := (approach != "") ? StrLower(approach) : "_____"
-    base := "Impella left ventricular assist device via " approachText " approach"
+    base := "Impella left ventricular assist device (LVAD) via " approachText " approach"
     if (crossing)
         base .= ", crossing the aortic valve plane"
     base .= "."
@@ -1745,8 +1746,8 @@ LT_Sentence_RetainedLeads(fields) {
 LT_Sentence_LVAD(fields) {
     model := fields.Get("model", "")
     if (model = "")
-        return "Left ventricular assist device."
-    return model " left ventricular assist device."
+        return "Left ventricular assist device (LVAD)."
+    return model " left ventricular assist device (LVAD)."
 }
 
 ; Each entry is Map("text", "...", "plural", true/false) -- plural reflects
@@ -1852,12 +1853,48 @@ LT_BuildRemovalLine() {
     return LT_StripTrailingPeriod(LT_JoinRemovalSentence(removalNouns))
 }
 
+; Any full term + parenthetical acronym pattern that appears in actual
+; report text (not just device-picker labels) -- add here to get the
+; "spell it out once, acronym after that" treatment automatically anywhere
+; it's used.
+LT_AcronymPairs := [
+    ["peripherally inserted central catheter (PICC)", "PICC"],
+    ["venous extracorporeal membrane oxygenation (ECMO) cannula", "ECMO cannula"],
+    ["left ventricular assist device (LVAD)", "LVAD"]
+]
+
+; Scans a set of lines (in output order) for each known full-term/acronym
+; pair; every occurrence after the first gets collapsed to just the
+; acronym, preserving whether that particular occurrence was capitalized
+; (sentence-initial) or not. Matching is case-insensitive (AHK's default),
+; so this catches both "Peripherally..." and "peripherally..." uniformly.
+LT_CollapseRepeatedAcronyms(lines) {
+    for pair in LT_AcronymPairs {
+        full := pair[1]
+        short := pair[2]
+        seenCount := 0
+        for i, line in lines {
+            pos := InStr(line, full)
+            if (!pos)
+                continue
+            seenCount += 1
+            if (seenCount = 1)
+                continue  ; first mention keeps the full spelled-out form
+            matchedText := SubStr(line, pos, StrLen(full))
+            firstChar := SubStr(matchedText, 1, 1)
+            replacement := (firstChar = StrUpper(firstChar)) ? LT_Capitalize(short) : short
+            lines[i] := SubStr(line, 1, pos - 1) replacement SubStr(line, pos + StrLen(full))
+        }
+    }
+    return lines
+}
+
 LT_BuildLines() {
     lines := LT_BuildActiveLines()
     removalLine := LT_BuildRemovalLine()
     if (removalLine != "")
         lines.Push(removalLine)
-    return lines
+    return LT_CollapseRepeatedAcronyms(lines)
 }
 
 ; Plain-text clipboard format: newline-joined, with a leading blank line so
@@ -2244,6 +2281,7 @@ LT_CopyOutput(*) {
         lines := activeLines.Clone()
         if (removalLine != "")
             lines.Push(removalLine)
+        lines := LT_CollapseRepeatedAcronyms(lines)
         plain := ""
         for i, line in lines
             plain .= (i > 1 ? "`n" : "") line
@@ -3058,6 +3096,51 @@ LT_OnImageMove(wParam, lParam, msg, hwnd) {
     LT_SaveImageWinGeometry()
 }
 
+; Live-drag aspect ratio lock, matching whichever image is currently
+; loaded (so this stays correct even if a future diagram isn't square).
+; wParam identifies which edge/corner is being dragged (WMSZ_* constants);
+; lParam points at the proposed RECT, which we adjust in place.
+LT_OnImageSizing(wParam, lParam, msg, hwnd) {
+    global LT_ImageGui, LT_ImageCurrentKey
+    if (!IsObject(LT_ImageGui) || hwnd != LT_ImageGui.Hwnd)
+        return
+
+    cfg := LT_GetImageConfig(LT_ImageCurrentKey)
+    if (cfg = "")
+        return
+    ratio := cfg["nativeW"] / cfg["nativeH"]
+
+    left := NumGet(lParam, 0, "Int")
+    top := NumGet(lParam, 4, "Int")
+    right := NumGet(lParam, 8, "Int")
+    bottom := NumGet(lParam, 12, "Int")
+
+    w := right - left
+    h := bottom - top
+
+    WMSZ_TOP := 3, WMSZ_TOPLEFT := 4, WMSZ_TOPRIGHT := 5, WMSZ_BOTTOM := 6
+
+    if (wParam = WMSZ_TOP || wParam = WMSZ_BOTTOM) {
+        ; dragging a horizontal edge only -- height changed, derive width
+        right := left + Round(h * ratio)
+    } else {
+        ; dragging a vertical edge or any corner -- width changed, derive
+        ; height; anchor the bottom instead of the top when dragging from
+        ; a top-anchored corner, so the edge actually being dragged moves
+        newH := Round(w / ratio)
+        if (wParam = WMSZ_TOPLEFT || wParam = WMSZ_TOPRIGHT)
+            top := bottom - newH
+        else
+            bottom := top + newH
+    }
+
+    NumPut("Int", left, lParam, 0)
+    NumPut("Int", top, lParam, 4)
+    NumPut("Int", right, lParam, 8)
+    NumPut("Int", bottom, lParam, 12)
+    return true
+}
+
 ; Shows (creating if needed) the popup for the given image key, positioned
 ; to the left of the main window the first time this session, or wherever
 ; it was last left afterward. Only actually calls Show() when transitioning
@@ -3065,12 +3148,50 @@ LT_OnImageMove(wParam, lParam, msg, hwnd) {
 ; would otherwise happen on every single click while a vein device is
 ; expanded) isn't needed and risks exactly the kind of redraw glitch that
 ; showed up as a duplicated-looking image.
+; Work-area bounds (left/top/right/bottom, in screen coordinates) of
+; whichever monitor the given window is currently on -- used to check
+; whether the popup's default left-side position would land off-screen.
+LT_GetMonitorWorkArea(hwnd, &left, &top, &right, &bottom) {
+    MONITOR_DEFAULTTONEAREST := 2
+    hMonitor := DllCall("MonitorFromWindow", "ptr", hwnd, "uint", MONITOR_DEFAULTTONEAREST, "ptr")
+    mi := Buffer(40, 0)
+    NumPut("UInt", 40, mi, 0)  ; cbSize
+    DllCall("GetMonitorInfo", "ptr", hMonitor, "ptr", mi)
+    ; MONITORINFO: cbSize(4), rcMonitor(4x Int32), rcWork(4x Int32), dwFlags(4)
+    left := NumGet(mi, 20, "Int")
+    top := NumGet(mi, 24, "Int")
+    right := NumGet(mi, 28, "Int")
+    bottom := NumGet(mi, 32, "Int")
+}
+
+; True if the given window currently has the WS_EX_TOPMOST style -- used
+; to make the image popup mirror the main window's always-on-top state
+; exactly, rather than trying to duplicate every place that toggles it.
+LT_IsAlwaysOnTop(hwnd) {
+    GWL_EXSTYLE := -20
+    WS_EX_TOPMOST := 0x8
+    exStyle := DllCall("GetWindowLong", "ptr", hwnd, "int", GWL_EXSTYLE, "int")
+    return (exStyle & WS_EX_TOPMOST) != 0
+}
+
 LT_ShowImagePopup(imageKey, instId) {
     global LT_ImageGui, LT_ImagePicture, LT_GuiObj, LT_ImageDir
     global LT_ImageCurrentKey, LT_ImageCurrentInst, LT_ImageWinVisible
     global LT_ImageWinX, LT_ImageWinY, LT_ImageWinW, LT_ImageWinH, LT_ImageWinKnown
 
     LT_EnsureImageGui()
+
+    ; Mirror the main window's current always-on-top state -- checked live
+    ; every time, so it's correct regardless of whether the image window
+    ; was created before or after the main window last toggled it.
+    if (IsObject(LT_GuiObj)) {
+        try {
+            if (LT_IsAlwaysOnTop(LT_GuiObj.Hwnd))
+                LT_ImageGui.Opt("+AlwaysOnTop")
+            else
+                LT_ImageGui.Opt("-AlwaysOnTop")
+        }
+    }
     LT_ImageCurrentInst := instId
 
     if (imageKey != LT_ImageCurrentKey) {
@@ -3090,7 +3211,22 @@ LT_ShowImagePopup(imageKey, instId) {
                 try LT_GuiObj.GetPos(&mx, &my, &mw, &mh)
             LT_ImageWinW := 480
             LT_ImageWinH := 480
-            LT_ImageWinX := mx - LT_ImageWinW - 15
+
+            leftX := mx - LT_ImageWinW - 15
+            rightX := mx + mw + 15
+
+            gotMonitor := false
+            if (IsObject(LT_GuiObj)) {
+                try {
+                    LT_GetMonitorWorkArea(LT_GuiObj.Hwnd, &monLeft, &monTop, &monRight, &monBottom)
+                    gotMonitor := true
+                }
+            }
+
+            ; Only override to the right side if the left position would
+            ; genuinely land off that monitor's left edge -- otherwise keep
+            ; the normal left placement.
+            LT_ImageWinX := (gotMonitor && leftX < monLeft) ? rightX : leftX
             LT_ImageWinY := my
             LT_ImageWinKnown := true
         }
