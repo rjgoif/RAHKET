@@ -3082,7 +3082,14 @@ LT_SyncImagePictureSize() {
 }
 
 LT_OnImageResize(GuiObj, MinMax, W, H) {
+    global LT_ImageWinVisible
     if (MinMax = -1)  ; minimized
+        return
+    ; Ignore resize events that fire while the popup isn't supposed to be
+    ; visible (e.g. during a Hide() transition) -- Windows can report
+    ; transient/wrong geometry at that moment, and caching it here would
+    ; corrupt the size used for every subsequent reshow this session.
+    if (!LT_ImageWinVisible)
         return
     LT_SyncImagePictureSize()
     LT_RefreshImageDisplay()
@@ -3100,6 +3107,41 @@ LT_OnImageMove(wParam, lParam, msg, hwnd) {
 ; loaded (so this stays correct even if a future diagram isn't square).
 ; wParam identifies which edge/corner is being dragged (WMSZ_* constants);
 ; lParam points at the proposed RECT, which we adjust in place.
+; Outer window size minus client area size -- title bar + border overhead.
+; Needed because the image fills the client area, not the outer window
+; frame, and those two sizes differ (mainly by title bar height).
+; Outer window size minus client area size -- title bar + border overhead.
+; Needed because the image fills the client area, not the outer window
+; frame, and those two sizes differ (mainly by title bar height).
+;
+; Computed via AdjustWindowRectEx from the window's style bits, not by
+; measuring actual on-screen geometry (GetWindowRect/GetClientRect) --
+; measuring right after Show() can read stale layout before Windows has
+; actually finished sizing the window, which is what made the first version
+; of this unreliable. Style-based calculation has no such timing dependency
+; and works even on a window that's never been shown yet.
+LT_GetWindowChrome(hwnd, &deltaW, &deltaH) {
+    GWL_STYLE := -16
+    GWL_EXSTYLE := -20
+    style := DllCall("GetWindowLong", "ptr", hwnd, "int", GWL_STYLE, "int")
+    exStyle := DllCall("GetWindowLong", "ptr", hwnd, "int", GWL_EXSTYLE, "int")
+
+    ; arbitrary reference client size -- the delta is the same regardless
+    ; of what size is used here, since chrome overhead doesn't scale
+    rect := Buffer(16, 0)
+    NumPut("Int", 0, rect, 0)
+    NumPut("Int", 0, rect, 4)
+    NumPut("Int", 100, rect, 8)
+    NumPut("Int", 100, rect, 12)
+    DllCall("AdjustWindowRectEx", "ptr", rect, "int", style, "int", 0, "int", exStyle)
+
+    outerW := NumGet(rect, 8, "Int") - NumGet(rect, 0, "Int")
+    outerH := NumGet(rect, 12, "Int") - NumGet(rect, 4, "Int")
+
+    deltaW := outerW - 100
+    deltaH := outerH - 100
+}
+
 LT_OnImageSizing(wParam, lParam, msg, hwnd) {
     global LT_ImageGui, LT_ImageCurrentKey
     if (!IsObject(LT_ImageGui) || hwnd != LT_ImageGui.Hwnd)
@@ -3110,28 +3152,32 @@ LT_OnImageSizing(wParam, lParam, msg, hwnd) {
         return
     ratio := cfg["nativeW"] / cfg["nativeH"]
 
+    LT_GetWindowChrome(hwnd, &dw, &dh)
+
     left := NumGet(lParam, 0, "Int")
     top := NumGet(lParam, 4, "Int")
     right := NumGet(lParam, 8, "Int")
     bottom := NumGet(lParam, 12, "Int")
 
-    w := right - left
-    h := bottom - top
+    ; work in client-area-equivalent dimensions, since that's what actually
+    ; needs to match the image's ratio, not the outer window frame
+    w := (right - left) - dw
+    h := (bottom - top) - dh
 
     WMSZ_TOP := 3, WMSZ_TOPLEFT := 4, WMSZ_TOPRIGHT := 5, WMSZ_BOTTOM := 6
 
     if (wParam = WMSZ_TOP || wParam = WMSZ_BOTTOM) {
         ; dragging a horizontal edge only -- height changed, derive width
-        right := left + Round(h * ratio)
+        right := left + Round(h * ratio) + dw
     } else {
         ; dragging a vertical edge or any corner -- width changed, derive
         ; height; anchor the bottom instead of the top when dragging from
         ; a top-anchored corner, so the edge actually being dragged moves
         newH := Round(w / ratio)
         if (wParam = WMSZ_TOPLEFT || wParam = WMSZ_TOPRIGHT)
-            top := bottom - newH
+            top := bottom - newH - dh
         else
-            bottom := top + newH
+            bottom := top + newH + dh
     }
 
     NumPut("Int", left, lParam, 0)
@@ -3236,6 +3282,17 @@ LT_ShowImagePopup(imageKey, instId) {
             LT_ImageWinX := (gotMonitor && leftX < monLeft) ? rightX : leftX
             LT_ImageWinY := my
             LT_ImageWinKnown := true
+
+            ; LT_ImageWinW/H above are the *target client area* size --
+            ; convert to the outer window size the image actually needs
+            ; Show() to use, via the style-based chrome calculation (works
+            ; before the window's ever been shown, unlike measuring actual
+            ; on-screen geometry).
+            try {
+                LT_GetWindowChrome(LT_ImageGui.Hwnd, &dw, &dh)
+                LT_ImageWinW += dw
+                LT_ImageWinH += dh
+            }
         }
         try LT_ImageGui.Show("x" LT_ImageWinX " y" LT_ImageWinY " w" LT_ImageWinW " h" LT_ImageWinH)
         LT_ImageWinVisible := true
@@ -3247,9 +3304,9 @@ LT_ShowImagePopup(imageKey, instId) {
 
 LT_HideImagePopup() {
     global LT_ImageGui, LT_ImageCurrentInst, LT_ImageWinVisible
+    LT_ImageWinVisible := false
     if (IsObject(LT_ImageGui))
         try LT_ImageGui.Hide()
-    LT_ImageWinVisible := false
     LT_ImageCurrentInst := ""
 }
 
