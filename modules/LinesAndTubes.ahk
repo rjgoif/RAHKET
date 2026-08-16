@@ -477,38 +477,41 @@ LT_FeedingTipGroups := [
         Map("label", "Distal esophagus", "short", "Distal", "phrase", "in the distal esophagus")
     ]),
     Map("groupLabel", "Esophagogastric junction", "states", [
-        Map("label", "Near esophagogastric junction", "short", "Near", "phrase", "near the esophagogastric junction"),
-        Map("label", "Above esophagogastric junction", "short", "Above", "phrase", "above the esophagogastric junction"),
-        Map("label", "Below esophagogastric junction", "short", "Below", "phrase", "below the esophagogastric junction")
+        Map("label", "Near the esophagogastric junction", "short", "Near", "phrase", "near the esophagogastric junction"),
+        Map("label", "Before or at the esophagogastric junction", "short", "Before/at", "phrase", "before or at the esophagogastric junction"),
+        Map("label", "At the esophagogastric junction", "short", "At", "phrase", "at the esophagogastric junction"),
+        Map("label", "At or beyond the esophagogastric junction", "short", "At/beyond", "phrase", "at or beyond the esophagogastric junction")
     ]),
     Map("groupLabel", "Gastric conduit", "states", [
         Map("label", "Gastric conduit", "phrase", "in the gastric conduit")
     ]),
-    Map("groupLabel", "Stomach (tip and side port)", "states", [
-        Map("label", "Stomach (tip and side port)", "short", "(unspecified)", "phrase", "__STOMACH_GEN__"),
-        Map("label", "Proximal stomach", "short", "Proximal", "phrase", "__STOMACH_PROX__"),
-        Map("label", "Mid stomach", "short", "Mid", "phrase", "__STOMACH_MID__"),
-        Map("label", "Distal stomach", "short", "Distal", "phrase", "__STOMACH_DIST__")
+    Map("groupLabel", "Stomach", "states", [
+        Map("label", "Stomach (unspecified)", "short", "(unspecified)", "phrase", "in the stomach"),
+        Map("label", "Proximal stomach", "short", "Proximal", "phrase", "in the proximal stomach"),
+        Map("label", "Fundus", "phrase", "in the gastric fundus"),
+        Map("label", "Mid stomach", "short", "Mid", "phrase", "in the mid stomach"),
+        Map("label", "Distal stomach", "short", "Distal", "phrase", "in the distal stomach")
     ]),
     Map("groupLabel", "Duodenum", "states", [
-        Map("label", "Duodenum (unspecified)", "short", "(unspecified)", "phrase", "in the duodenum"),
-        Map("label", "Proximal duodenum", "short", "Proximal", "phrase", "in the proximal duodenum"),
-        Map("label", "Mid duodenum", "short", "Mid", "phrase", "in the mid duodenum"),
-        Map("label", "Distal duodenum", "short", "Distal", "phrase", "in the distal duodenum")
+        Map("label", "Duodenum", "phrase", "postpyloric and into the duodenum")
     ]),
-    Map("groupLabel", "Near the pylorus", "states", [
-        Map("label", "Near the pylorus", "short", "Near", "phrase", "near the pylorus")
+    Map("groupLabel", "Pylorus", "states", [
+        Map("label", "Near the pylorus", "short", "Near", "phrase", "near the pylorus"),
+        Map("label", "Before or at the pylorus", "short", "Before/at", "phrase", "before or at the pylorus"),
+        Map("label", "At the pylorus", "short", "At", "phrase", "at the pylorus"),
+        Map("label", "At or beyond the pylorus", "short", "At/beyond", "phrase", "at or beyond the pylorus")
     ]),
     Map("groupLabel", "Duodenojejunal junction", "states", [
         Map("label", "At duodenojejunal junction", "short", "At", "phrase", "at the duodenojejunal junction"),
         Map("label", "Beyond duodenojejunal junction", "short", "Beyond", "phrase", "beyond the duodenojejunal junction")
     ]),
-    Map("groupLabel", "Off-image below diaphragm", "states", [
-        Map("label", "Off-image below diaphragm", "phrase", "__OFFIMAGE__")
+    Map("groupLabel", "Below diaphragm", "states", [
+        Map("label", "Below diaphragm", "phrase", "below the diaphragm"),
+        Map("label", "Off-image below diaphragm", "short", "Off-image", "phrase", "off-image below the diaphragm")
     ]),
-    Map("groupLabel", "Malpositioned bronchus", "states", [
-        Map("label", "Right lower lobe bronchus", "short", "Right", "phrase", "__MALPOS_R__"),
-        Map("label", "Left lower lobe bronchus", "short", "Left", "phrase", "__MALPOS_L__")
+    Map("groupLabel", "Endobronchial", "requiresSubSelection", true, "states", [
+        Map("label", "Right lung", "short", "Right", "phrase", "endobronchial, in the right lung"),
+        Map("label", "Left lung", "short", "Left", "phrase", "endobronchial, in the left lung")
     ]),
     Map("groupLabel", "Other", "states", [
         Map("label", "Other", "phrase", "__OTHER__")
@@ -587,8 +590,8 @@ LT_VeinImageNativeH := 937
 ; groups array (Projecting or PICC phrasing) the clicked device's own "tip"
 ; field actually uses, so this same map drives IJ/SCV/PICC/Port uniformly.
 LT_VeinRegionMap := Map(
-    "R side", Map("side", "Right"),
-    "L side", Map("side", "Left"),
+    "R side", Map("plainField", "laterality", "plainValue", "Right"),
+    "L side", Map("plainField", "laterality", "plainValue", "Left"),
     "R axillary", Map("family", "Axillary v.", "state", "Right axillary vein"),
     "L axillary", Map("family", "Axillary v.", "state", "Left axillary vein"),
     "R subclavian", Map("family", "Subclavian v.", "state", "Right subclavian vein"),
@@ -619,6 +622,67 @@ LT_VeinRegionMap := Map(
     "L PA", Map("family", "L. pulmonary art.", "state", "Left pulmonary artery"),
     "R interlobar", Map("family", "Interlobar art.", "state", "Right interlobar artery"),
     "L interlobar", Map("family", "Interlobar art.", "state", "Left interlobar artery")
+)
+
+; Traced regions for enteric_feeding.png (951x939 native), same idea as the
+; vein data above -- shared by Enteric and Feeding tube, not GGJ.
+LT_EntericFeedingImageRegions := [
+    Map("name", "R lung", "points", [[371, 311], [345, 324], [328, 351], [320, 393], [323, 421], [336, 458], [356, 476], [374, 480], [398, 470], [420, 431], [425, 395], [420, 361], [412, 340], [397, 322], [386, 316]]),
+    Map("name", "L lung", "points", [[588, 311], [559, 328], [542, 364], [538, 400], [543, 432], [560, 466], [588, 481], [610, 473], [624, 457], [635, 434], [641, 401], [639, 370], [629, 341], [613, 321]]),
+    Map("name", "esophagus", "points", [[449, 1], [452, 89], [448, 237], [448, 370], [450, 504], [462, 572], [469, 605], [482, 595], [495, 588], [496, 585], [486, 554], [477, 504], [469, 427], [463, 324], [464, 244], [465, 128], [467, 55], [468, 0]]),
+    Map("name", "distal esophagus", "points", [[471, 462], [498, 462], [506, 502], [515, 540], [527, 579], [512, 579], [499, 584], [496, 586], [487, 558], [479, 521], [475, 489]]),
+    Map("name", "mid esophagus", "points", [[465, 223], [463, 273], [465, 369], [468, 429], [471, 464], [497, 463], [491, 421], [485, 345], [485, 268], [484, 223]]),
+    Map("name", "prox esophagus", "points", [[491, 1], [488, 93], [485, 187], [483, 224], [464, 223], [464, 143], [466, 48], [469, 0]]),
+    Map("name", "EG junction", "points", [[497, 588], [504, 604], [518, 623], [535, 642], [543, 647], [580, 653], [586, 654], [575, 662], [558, 669], [542, 672], [526, 659], [507, 648], [481, 629], [471, 605], [483, 594]]),
+    Map("name", "at beyond EG", "points", [[550, 629], [534, 639], [543, 647], [571, 653], [586, 655], [590, 639], [587, 630], [572, 630], [560, 631], [550, 629]]),
+    Map("name", "at EG", "points", [[509, 611], [521, 605], [534, 599], [537, 607], [536, 615], [540, 624], [544, 629], [550, 628], [534, 638], [515, 620], [512, 616]]),
+    Map("name", "above at EG", "points", [[534, 598], [527, 580], [513, 580], [497, 587], [501, 596], [509, 610]]),
+    Map("name", "stomach", "points", [[589, 654], [647, 661], [672, 672], [682, 690], [677, 712], [664, 725], [611, 767], [572, 799], [529, 829], [507, 841], [479, 851], [478, 828], [469, 800], [463, 790], [516, 754], [552, 733], [579, 717], [589, 708], [593, 702], [590, 697], [585, 692], [578, 689], [564, 683], [555, 679], [548, 673], [546, 671], [566, 667], [580, 661], [584, 657]]),
+    Map("name", "fundus", "points", [[647, 661], [669, 642], [691, 623], [672, 622], [622, 626], [595, 629], [587, 629], [590, 644], [588, 654], [618, 657]]),
+    Map("name", "prox stomach", "points", [[692, 623], [721, 631], [746, 648], [762, 668], [772, 691], [774, 720], [769, 746], [764, 758], [661, 728], [678, 711], [683, 691], [678, 676], [661, 666], [647, 661]]),
+    Map("name", "mid stomach", "points", [[661, 728], [631, 754], [593, 783], [560, 808], [606, 864], [664, 842], [689, 828], [723, 806], [742, 788], [763, 758]]),
+    Map("name", "distal stomach", "points", [[479, 851], [499, 845], [514, 837], [536, 823], [561, 807], [606, 864], [561, 876], [525, 884], [498, 888], [475, 891], [479, 871], [479, 862]]),
+    Map("name", "pylorus", "points", [[479, 851], [439, 859], [416, 866], [398, 873], [385, 881], [378, 886], [378, 863], [383, 838], [419, 817], [442, 805], [463, 790]]),
+    Map("name", "above at pyloris", "points", [[449, 858], [456, 892], [475, 891], [478, 872], [478, 851]]),
+    Map("name", "at pylorus", "points", [[412, 867], [414, 899], [456, 893], [449, 857]]),
+    Map("name", "at beyond pylorus", "points", [[412, 868], [396, 873], [379, 885], [381, 899], [387, 917], [395, 907], [398, 904], [406, 902], [414, 900]]),
+    Map("name", "postpyloric", "points", [[386, 918], [379, 892], [377, 874], [382, 837], [362, 854], [347, 875], [335, 905], [331, 928], [332, 936], [373, 938], [377, 927]]),
+    Map("name", "tip", "points", [[849, 110], [925, 110], [924, 48], [849, 48]]),
+    Map("name", "port", "points", [[807, 130], [806, 182], [924, 184], [924, 122], [807, 124]]),
+    Map("name", "tip and port", "points", [[925, 242], [923, 191], [603, 189], [603, 247]]),
+    Map("name", "below diaphragm", "points", [[780, 637], [782, 716], [835, 715], [835, 633]]),
+    Map("name", "off image", "points", [[783, 732], [781, 909], [835, 911], [836, 729]])
+]
+
+LT_EntericFeedingImageNativeW := 951
+LT_EntericFeedingImageNativeH := 939
+
+LT_EntericFeedingRegionMap := Map(
+    "R lung", Map("family", "Endobronchial", "state", "Right lung"),
+    "L lung", Map("family", "Endobronchial", "state", "Left lung"),
+    "esophagus", Map("family", "Esophagus", "state", "Esophagus (unspecified)"),
+    "prox esophagus", Map("family", "Esophagus", "state", "Upper esophagus"),
+    "mid esophagus", Map("family", "Esophagus", "state", "Mid esophagus"),
+    "distal esophagus", Map("family", "Esophagus", "state", "Distal esophagus"),
+    "EG junction", Map("family", "Esophagogastric junction", "state", "Near the esophagogastric junction"),
+    "above at EG", Map("family", "Esophagogastric junction", "state", "Before or at the esophagogastric junction"),
+    "at EG", Map("family", "Esophagogastric junction", "state", "At the esophagogastric junction"),
+    "at beyond EG", Map("family", "Esophagogastric junction", "state", "At or beyond the esophagogastric junction"),
+    "stomach", Map("family", "Stomach", "state", "Stomach (unspecified)"),
+    "fundus", Map("family", "Stomach", "state", "Fundus"),
+    "prox stomach", Map("family", "Stomach", "state", "Proximal stomach"),
+    "mid stomach", Map("family", "Stomach", "state", "Mid stomach"),
+    "distal stomach", Map("family", "Stomach", "state", "Distal stomach"),
+    "pylorus", Map("family", "Pylorus", "state", "Near the pylorus"),
+    "above at pyloris", Map("family", "Pylorus", "state", "Before or at the pylorus"),
+    "at pylorus", Map("family", "Pylorus", "state", "At the pylorus"),
+    "at beyond pylorus", Map("family", "Pylorus", "state", "At or beyond the pylorus"),
+    "postpyloric", Map("family", "Duodenum", "state", "Duodenum"),
+    "below diaphragm", Map("family", "Below diaphragm", "state", "Below diaphragm"),
+    "off image", Map("family", "Below diaphragm", "state", "Off-image below diaphragm"),
+    "tip", Map("plainField", "part", "plainValue", "Tip"),
+    "port", Map("plainField", "part", "plainValue", "Side port"),
+    "tip and port", Map("plainField", "part", "plainValue", "Tip and side port")
 )
 ; Only set these if running standalone
 if (A_LineFile = A_ScriptFullPath) {
@@ -680,10 +744,13 @@ LT_BuildDeviceDefs() {
         "label", "Enteric tube",
         "fields", [
             Map("id", "location", "type", "grouped", "label", "Tip location",
-                "groups", LT_EntericTipGroups)
+                "groups", LT_FeedingTipGroups),
+            Map("id", "part", "type", "buttons", "label", "Part",
+                "options", ["Tip", "Side port", "Tip and side port"])
         ],
         "sentenceFn", (fields) => LT_Sentence_Enteric(fields, "Enteric tube"),
-        "removalNoun", (fields) => Map("text", "enteric tube", "plural", false)
+        "removalNoun", (fields) => Map("text", "enteric tube", "plural", false),
+        "imageKey", "enteric_feeding"
     )
 
     defs["FEEDING"] := Map(
@@ -691,11 +758,14 @@ LT_BuildDeviceDefs() {
         "fields", [
             Map("id", "location", "type", "grouped", "label", "Tip location",
                 "groups", LT_FeedingTipGroups),
+            Map("id", "part", "type", "buttons", "label", "Part",
+                "options", ["Tip", "Side port", "Tip and side port"]),
             Map("id", "weighted", "type", "toggle", "label", "Weighted tip"),
             Map("id", "stylet", "type", "toggle", "label", "With stylet")
         ],
         "sentenceFn", LT_Sentence_Feeding,
-        "removalNoun", (fields) => Map("text", fields.Get("weighted", false) ? "weighted feeding tube" : "feeding tube", "plural", false)
+        "removalNoun", (fields) => Map("text", fields.Get("weighted", false) ? "weighted feeding tube" : "feeding tube", "plural", false),
+        "imageKey", "enteric_feeding"
     )
 
     defs["GGJ"] := Map(
@@ -1038,20 +1108,9 @@ LT_BuildProjectingSubclavianGroups() {
 ; starts in the stomach.
 LT_BuildGGJTipGroups() {
     global LT_FeedingTipGroups
-    excluded := ["Esophagus", "Esophagogastric junction", "Gastric conduit", "Malpositioned bronchus"]
+    excluded := ["Esophagus", "Esophagogastric junction", "Gastric conduit", "Endobronchial"]
     arr := []
     for grp in LT_FeedingTipGroups {
-        if (grp["groupLabel"] = "Stomach (tip and side port)") {
-            ; G/GJ/J tubes have no side port -- tip location only, not the
-            ; "tip and side port" phrasing feeding tubes use
-            arr.Push(Map("groupLabel", "Stomach", "states", [
-                Map("label", "Stomach (unspecified)", "short", "(unspecified)", "phrase", "in the stomach"),
-                Map("label", "Proximal stomach", "short", "Proximal", "phrase", "in the proximal stomach"),
-                Map("label", "Mid stomach", "short", "Mid", "phrase", "in the mid stomach"),
-                Map("label", "Distal stomach", "short", "Distal", "phrase", "in the distal stomach")
-            ]))
-            continue
-        }
         skip := false
         for ex in excluded {
             if (grp["groupLabel"] = ex) {
@@ -1275,28 +1334,15 @@ LT_Sentence_ETT(fields) {
 
 LT_Sentence_Enteric(fields, deviceLabel) {
     loc := fields.Get("location_phrase", "")
+    part := fields.Get("part", "")
+    partText := (part = "Side port") ? "side port" : (part = "Tip and side port") ? "tip and side port" : "tip"
 
     if (loc = "")
         return deviceLabel "."
-
     if (loc = "__OTHER__")
-        return deviceLabel " tip _____."
-    if (loc = "__STOMACH_GEN__")
-        return deviceLabel " tip and side port in the stomach."
-    if (loc = "__STOMACH_PROX__")
-        return deviceLabel " tip and side port in the proximal stomach."
-    if (loc = "__STOMACH_MID__")
-        return deviceLabel " tip and side port in the mid stomach."
-    if (loc = "__STOMACH_DIST__")
-        return deviceLabel " tip and side port in the distal stomach."
-    if (loc = "__OFFIMAGE__")
-        return deviceLabel " tip off-image below the diaphragm."
-    if (loc = "__MALPOS_R__")
-        return deviceLabel " tip malpositioned in the right lower lobe bronchus."
-    if (loc = "__MALPOS_L__")
-        return deviceLabel " tip malpositioned in the left lower lobe bronchus."
+        return deviceLabel " " partText " _____."
 
-    return deviceLabel " tip " loc "."
+    return deviceLabel " " partText " " loc "."
 }
 
 LT_Sentence_Feeding(fields) {
@@ -1738,11 +1784,10 @@ LT_StripTrailingPeriod(s) {
     return s
 }
 
-LT_BuildLines() {
+LT_BuildActiveLines() {
     global LT_DeviceOrder, LT_InstanceOrder, LT_Instances, LT_DeviceDefs
 
     lines := []
-    removalNouns := []
 
     for deviceKey in LT_DeviceOrder {
         def := LT_DeviceDefs[deviceKey]
@@ -1756,8 +1801,7 @@ LT_BuildLines() {
             fields := inst["fields"]
 
             if (fields.Get("removed", false)) {
-                removalFn := def["removalNoun"]
-                removalNouns.Push(removalFn(fields))
+                continue
             } else if (isAggregate) {
                 activeFieldsList.Push(fields)
             } else {
@@ -1779,9 +1823,37 @@ LT_BuildLines() {
         }
     }
 
-    if (removalNouns.Length > 0)
-        lines.Push(LT_StripTrailingPeriod(LT_JoinRemovalSentence(removalNouns)))
+    return lines
+}
 
+; "" if nothing is marked removed, otherwise the one grouped "X, Y are now
+; absent" sentence.
+LT_BuildRemovalLine() {
+    global LT_DeviceOrder, LT_InstanceOrder, LT_Instances, LT_DeviceDefs
+
+    removalNouns := []
+    for deviceKey in LT_DeviceOrder {
+        def := LT_DeviceDefs[deviceKey]
+        for instId in LT_InstanceOrder {
+            inst := LT_Instances[instId]
+            if (inst["deviceKey"] != deviceKey)
+                continue
+            fields := inst["fields"]
+            if (fields.Get("removed", false))
+                removalNouns.Push(def["removalNoun"](fields))
+        }
+    }
+
+    if (removalNouns.Length = 0)
+        return ""
+    return LT_StripTrailingPeriod(LT_JoinRemovalSentence(removalNouns))
+}
+
+LT_BuildLines() {
+    lines := LT_BuildActiveLines()
+    removalLine := LT_BuildRemovalLine()
+    if (removalLine != "")
+        lines.Push(removalLine)
     return lines
 }
 
@@ -1835,6 +1907,14 @@ LT_RemoveInstance(instId, *) {
         }
     }
     LT_RebuildMiddleColumn()
+}
+
+; Shift+Delete: removes whichever instance is currently expanded (the same
+; notion of "what you're working on" the image popup already tracks).
+LT_HotkeyRemoveSelected(*) {
+    instId := LT_FindExpandedInstance()
+    if (instId != "")
+        LT_RemoveInstance(instId)
 }
 
 LT_ClearAll(*) {
@@ -2062,6 +2142,27 @@ LT_RtfEscape(s) {
 ; word -- a semantic instruction telling the reader to draw its own bullet
 ; glyph, not a literal typed character -- with a hanging indent so wrapped
 ; continuation lines still align under the text rather than the bullet.
+; A single line doesn't need list machinery -- no leading blank paragraph
+; (that's only there to let PowerScribe's own list continue from it), no
+; \pn bullet definition, just the plain text.
+LT_BuildPlainRTF(lines) {
+    header := "
+    (LTrim
+    {\rtf1\ansi\ansicpg1252\deff0\deflang1033
+    {\fonttbl{\f0\fswiss\fcharset0 Calibri;}}
+    {\*\generator LinesAndTubes;}
+    \viewkind4\uc1\pard\f0\fs22
+    )"
+    rtf := header
+    for i, line in lines {
+        if (i > 1)
+            rtf .= "\par"
+        rtf .= LT_RtfEscape(line)
+    }
+    rtf .= "}"
+    return rtf
+}
+
 LT_BuildBulletRTF(lines) {
     ; Matched directly against real RTF captured from PowerScribe's own
     ; editor (Riched20), not the Word-style {\listtable}/{\listoverridetable}
@@ -2133,9 +2234,22 @@ LT_CopyOutput(*) {
         MsgBox("Please complete the selection for all red devices.", "Incomplete selection", 48)
         return
     }
-    lines := LT_BuildLines()
-    plain := LT_JoinLinesPlain(lines)
-    rtf := LT_BuildBulletRTF(lines)
+    activeLines := LT_BuildActiveLines()
+    removalLine := LT_BuildRemovalLine()
+
+    if (activeLines.Length <= 1) {
+        lines := activeLines.Clone()
+        if (removalLine != "")
+            lines.Push(removalLine)
+        plain := ""
+        for i, line in lines
+            plain .= (i > 1 ? "`n" : "") line
+        rtf := LT_BuildPlainRTF(lines)
+    } else {
+        lines := LT_BuildLines()
+        plain := LT_JoinLinesPlain(lines)
+        rtf := LT_BuildBulletRTF(lines)
+    }
     LT_SetClipboardTextAndRTF(plain, rtf)
     ToolTip("Copied to clipboard")
     SetTimer(() => ToolTip(), -1000)
@@ -2745,20 +2859,27 @@ LT_GdipLoadImage(imageKey, path) {
 ; decide what to highlight. Both a resolved tip state and a chosen side
 ; can be highlighted at once, since they're independent fields.
 LT_FindSelectedRegionNames() {
-    global LT_Instances, LT_ImageCurrentInst, LT_VeinRegionMap
+    global LT_Instances, LT_ImageCurrentInst, LT_ImageCurrentKey
     names := []
     if (LT_ImageCurrentInst = "" || !LT_Instances.Has(LT_ImageCurrentInst))
         return names
 
-    fields := LT_Instances[LT_ImageCurrentInst]["fields"]
-    curTipState := fields.Get("tip", "")
-    curSide := fields.Get("laterality", "")
+    cfg := LT_GetImageConfig(LT_ImageCurrentKey)
+    if (cfg = "")
+        return names
 
-    for name, target in LT_VeinRegionMap {
-        if (target.Has("state") && curTipState != "" && target["state"] = curTipState)
+    fields := LT_Instances[LT_ImageCurrentInst]["fields"]
+    curLocState := fields.Get(cfg["locField"], "")
+    regionMap := cfg["regionMap"]
+
+    for name, target in regionMap {
+        if (target.Has("state") && curLocState != "" && target["state"] = curLocState)
             names.Push(name)
-        else if (target.Has("side") && curSide != "" && target["side"] = curSide)
-            names.Push(name)
+        else if (target.Has("plainField")) {
+            curVal := fields.Get(target["plainField"], "")
+            if (curVal != "" && curVal = target["plainValue"])
+                names.Push(name)
+        }
     }
     return names
 }
@@ -2768,13 +2889,15 @@ LT_FindSelectedRegionNames() {
 ; size) into a fresh bitmap, and shows that on the Picture control.
 LT_RenderImageWithHighlight(dispW, dispH) {
     global LT_ImagePicture, LT_ImageCurrentKey, LT_ImageCurrentHBitmap
-    global LT_GdipImageBitmaps, LT_VeinImageRegions, LT_VeinImageNativeW, LT_VeinImageNativeH
+    global LT_GdipImageBitmaps
 
     if (LT_ImageCurrentKey = "" || !LT_GdipImageBitmaps.Has(LT_ImageCurrentKey))
         return
     pBitmap := LT_GdipImageBitmaps[LT_ImageCurrentKey]
     if (!pBitmap || dispW <= 0 || dispH <= 0)
         return
+
+    cfg := LT_GetImageConfig(LT_ImageCurrentKey)
 
     PixelFormat32bppPARGB := 0x26200A
     pCanvas := 0
@@ -2787,13 +2910,13 @@ LT_RenderImageWithHighlight(dispW, dispH) {
     DllCall("gdiplus\GdipSetInterpolationMode", "ptr", pGraphics, "int", 7)  ; HighQualityBicubic
     DllCall("gdiplus\GdipDrawImageRectI", "ptr", pGraphics, "ptr", pBitmap, "int", 0, "int", 0, "int", dispW, "int", dispH)
 
-    regionNames := (LT_ImageCurrentKey = "vein") ? LT_FindSelectedRegionNames() : []
-    if (regionNames.Length > 0 && LT_ImageCurrentKey = "vein") {
-        scaleX := dispW / LT_VeinImageNativeW
-        scaleY := dispH / LT_VeinImageNativeH
+    regionNames := (cfg != "") ? LT_FindSelectedRegionNames() : []
+    if (regionNames.Length > 0 && cfg != "") {
+        scaleX := dispW / cfg["nativeW"]
+        scaleY := dispH / cfg["nativeH"]
         pBrush := 0
         DllCall("gdiplus\GdipCreateSolidFill", "uint", 0x6E1E90FF, "ptr*", &pBrush)  ; translucent dodger-blue
-        for region in LT_VeinImageRegions {
+        for region in cfg["regions"] {
             matched := false
             for n in regionNames {
                 if (n = region["name"]) {
@@ -3013,13 +3136,34 @@ LT_UpdateImagePopup() {
 ; image window's client area -- since the Picture control always exactly
 ; fills that client area (see LT_SyncImagePictureSize), those are already
 ; the control-relative coordinates we need.
+; Per-image config: which regions/native size/routing map to use, and which
+; field on the device the location regions resolve against (vein uses
+; "tip", enteric/feeding uses "location"). Centralizing this is what lets
+; the click handler, highlighter, and reverse-lookup all stay image-agnostic
+; instead of hardcoding "vein" specifically.
+LT_GetImageConfig(imageKey) {
+    global LT_VeinImageRegions, LT_VeinImageNativeW, LT_VeinImageNativeH, LT_VeinRegionMap
+    global LT_EntericFeedingImageRegions, LT_EntericFeedingImageNativeW, LT_EntericFeedingImageNativeH, LT_EntericFeedingRegionMap
+
+    if (imageKey = "vein")
+        return Map("regions", LT_VeinImageRegions, "nativeW", LT_VeinImageNativeW,
+            "nativeH", LT_VeinImageNativeH, "regionMap", LT_VeinRegionMap, "locField", "tip")
+    if (imageKey = "enteric_feeding")
+        return Map("regions", LT_EntericFeedingImageRegions, "nativeW", LT_EntericFeedingImageNativeW,
+            "nativeH", LT_EntericFeedingImageNativeH, "regionMap", LT_EntericFeedingRegionMap, "locField", "location")
+    return ""
+}
+
 LT_OnImagePictureClick(ctrl, info) {
     global LT_ImageGui, LT_ImageCurrentKey, LT_ImageCurrentInst
-    global LT_VeinImageRegions, LT_VeinImageNativeW, LT_VeinImageNativeH, LT_VeinRegionMap
     global LT_Instances, LT_DeviceDefs
 
     if (LT_ImageCurrentInst = "" || !LT_Instances.Has(LT_ImageCurrentInst))
         return
+
+    cfg := LT_GetImageConfig(LT_ImageCurrentKey)
+    if (cfg = "")
+        return  ; no region data for this image yet
 
     prevMode := A_CoordModeMouse
     CoordMode("Mouse", "Client")
@@ -3033,45 +3177,38 @@ LT_OnImagePictureClick(ctrl, info) {
     if (dispW = 0 || dispH = 0)
         return
 
-    regions := ""
-    nativeW := 0, nativeH := 0
-    if (LT_ImageCurrentKey = "vein") {
-        regions := LT_VeinImageRegions
-        nativeW := LT_VeinImageNativeW
-        nativeH := LT_VeinImageNativeH
-    } else {
-        return  ; no region data for this image yet
-    }
-
-    nx := dispX * (nativeW / dispW)
-    ny := dispY * (nativeH / dispH)
+    nx := dispX * (cfg["nativeW"] / dispW)
+    ny := dispY * (cfg["nativeH"] / dispH)
 
     matchName := ""
-    for region in regions {
+    for region in cfg["regions"] {
         if (LT_PointInPolygon(nx, ny, region["points"])) {
             matchName := region["name"]
             break
         }
     }
-    if (matchName = "" || !LT_VeinRegionMap.Has(matchName))
+    regionMap := cfg["regionMap"]
+    if (matchName = "" || !regionMap.Has(matchName))
         return
 
-    target := LT_VeinRegionMap[matchName]
+    target := regionMap[matchName]
     instId := LT_ImageCurrentInst
     inst := LT_Instances[instId]
     def := LT_DeviceDefs[inst["deviceKey"]]
     fields := inst["fields"]
 
-    if (target.Has("side")) {
-        fields["laterality"] := target["side"]
+    if (target.Has("plainField")) {
+        fields[target["plainField"]] := target["plainValue"]
         LT_RebuildMiddleColumn(instId)
         return
     }
 
-    ; tip family+state: resolve directly against whichever groups array
-    ; this device's own "tip" field actually uses (Projecting or PICC
-    ; phrasing), so the same region map drives every vein-image device.
-    fieldDef := LT_FindFieldDef(def, "tip")
+    ; family+state: resolve directly against whichever groups array this
+    ; device's own location field actually uses (e.g. vein's Projecting or
+    ; PICC phrasing variant), so the same region map drives every device
+    ; that shares this image.
+    locField := cfg["locField"]
+    fieldDef := LT_FindFieldDef(def, locField)
     if (fieldDef = "")
         return
     for grp in fieldDef["groups"] {
@@ -3079,9 +3216,9 @@ LT_OnImagePictureClick(ctrl, info) {
             continue
         for st in grp["states"] {
             if (st["label"] = target["state"]) {
-                fields["tip"] := st["label"]
-                fields["tip_phrase"] := st["phrase"]
-                fields["tip_activeFamily"] := grp["groupLabel"]
+                fields[locField] := st["label"]
+                fields[locField "_phrase"] := st["phrase"]
+                fields[locField "_activeFamily"] := grp["groupLabel"]
                 LT_RebuildMiddleColumn(instId)
                 return
             }
@@ -3113,6 +3250,13 @@ LT_EnsureGui() {
 
     LT_GuiObj := Gui("+Resize", "Lines and Tubes")
     LT_GuiObj.SetFont("s9", "Segoe UI")
+
+    HotIfWinActive("ahk_id " LT_GuiObj.Hwnd)
+    Hotkey("^c", LT_CopyOutput)
+    Hotkey("^n", LT_NewPatient)
+    Hotkey("^Delete", LT_ClearAll)
+    Hotkey("+Delete", LT_HotkeyRemoveSelected)
+    HotIfWinActive()
 
     leftW := 180
     LT_GuiObj.Add("Text", "x10 y10 w" leftW, "Add device:")
