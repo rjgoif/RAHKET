@@ -121,5 +121,23 @@ MsgBox(
     "Version file: " buildVersionFile,
     "Build Successful", 64
 )
-Run('explorer.exe "' buildDir '"')
+Run('explorer.exe "Z:\Goiffon\RAHKET\"')
+if !IsFolderOpenInExplorer(buildDir)
+    Run('explorer.exe "' buildDir '"')
 ExitApp()
+
+; ── Check whether a folder is already open in any Explorer window ──
+IsFolderOpenInExplorer(folderPath) {
+    folderPath := RTrim(folderPath, "\")
+    shell := ComObject("Shell.Application")
+    for win in shell.Windows() {
+        try {
+            winPath := RTrim(win.Document.Folder.Self.Path, "\")
+        } catch {
+            continue
+        }
+        if (winPath = folderPath)
+            return true
+    }
+    return false
+}
