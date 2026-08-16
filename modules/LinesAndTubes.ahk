@@ -31,11 +31,11 @@
 
 #Requires AutoHotkey v2.0
 
-; This file's own directory, regardless of whether it's the entry script
-; (standalone) or #Include'd by RAHKET_Main.ahk -- A_ScriptDir would give
-; the *entry* script's folder in the included case, which is wrong here.
-SplitPath(A_LineFile, , &LT_ScriptDir)
-LT_ImageDir := LT_ScriptDir "\LinesAndTubesImages"
+; Path to the click-region diagrams (same pattern as TN_ImgDir in
+; ThyroidNodules.ahk): default assumes included from RAHKET_Main, overridden
+; below for the standalone case inside the existing "only if running
+; standalone" block.
+LT_ImageDir := A_ScriptDir "\modules\LinesAndTubesImages"
 
 ; ---- global state ----
 LT_Instances       := Map()   ; instanceId -> {deviceKey, fields: Map}
@@ -686,6 +686,9 @@ LT_EntericFeedingRegionMap := Map(
 )
 ; Only set these if running standalone
 if (A_LineFile = A_ScriptFullPath) {
+    ; Override image dir when launched standalone (or compiled EXE on its own)
+    LT_ImageDir := A_ScriptDir "\LinesAndTubesImages"
+
     #SingleInstance Force
     Persistent
 
@@ -3063,7 +3066,7 @@ LT_OnImageMove(wParam, lParam, msg, hwnd) {
 ; expanded) isn't needed and risks exactly the kind of redraw glitch that
 ; showed up as a duplicated-looking image.
 LT_ShowImagePopup(imageKey, instId) {
-    global LT_ImageGui, LT_ImagePicture, LT_ImageDir, LT_GuiObj
+    global LT_ImageGui, LT_ImagePicture, LT_GuiObj, LT_ImageDir
     global LT_ImageCurrentKey, LT_ImageCurrentInst, LT_ImageWinVisible
     global LT_ImageWinX, LT_ImageWinY, LT_ImageWinW, LT_ImageWinH, LT_ImageWinKnown
 
@@ -3072,8 +3075,10 @@ LT_ShowImagePopup(imageKey, instId) {
 
     if (imageKey != LT_ImageCurrentKey) {
         imgPath := LT_ImageDir "\" imageKey ".png"
-        if (!FileExist(imgPath))
+        if (!FileExist(imgPath)) {
+            MsgBox("Diagram image not found:`n" imgPath, "Lines and Tubes", 48)
             return
+        }
         LT_GdipLoadImage(imageKey, imgPath)
         LT_ImageCurrentKey := imageKey
     }
