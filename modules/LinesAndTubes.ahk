@@ -1902,9 +1902,9 @@ LT_BuildLines() {
 LT_JoinLinesPlain(lines) {
     out := ""
     for line in lines
-        out .= line "`n"
-    out := RTrim(out, "`n")
-    return "`n" out
+        out .= line "`r`n"
+    out := RTrim(out, "`r`n")
+    return "`r`n" out
 }
 
 LT_BuildOutput() {
@@ -2196,7 +2196,7 @@ LT_BuildPlainRTF(lines) {
     rtf := header
     for i, line in lines {
         if (i > 1)
-            rtf .= "\par"
+            rtf .= "\par "
         rtf .= LT_RtfEscape(line)
     }
     rtf .= "}"
@@ -2284,7 +2284,7 @@ LT_CopyOutput(*) {
         lines := LT_CollapseRepeatedAcronyms(lines)
         plain := ""
         for i, line in lines
-            plain .= (i > 1 ? "`n" : "") line
+            plain .= (i > 1 ? "`r`n" : "") line
         rtf := LT_BuildPlainRTF(lines)
     } else {
         lines := LT_BuildLines()
@@ -3209,8 +3209,15 @@ LT_ShowImagePopup(imageKey, instId) {
             mx := 0, my := 0, mw := 0, mh := 0
             if (IsObject(LT_GuiObj))
                 try LT_GuiObj.GetPos(&mx, &my, &mw, &mh)
+
+            ; Size from the real image dimensions -- fixing the width at
+            ; 480 and deriving height from the actual ratio, rather than a
+            ; hardcoded square that only self-corrected once the person
+            ; manually resized (WM_SIZING only enforces the ratio live
+            ; during a drag, not at creation time).
+            cfg := LT_GetImageConfig(imageKey)
             LT_ImageWinW := 480
-            LT_ImageWinH := 480
+            LT_ImageWinH := (cfg != "") ? Round(480 * cfg["nativeH"] / cfg["nativeW"]) : 480
 
             leftX := mx - LT_ImageWinW - 15
             rightX := mx + mw + 15
