@@ -1784,11 +1784,7 @@ LT_StripTrailingPeriod(s) {
     return s
 }
 
-<<<<<<< HEAD
-LT_BuildLines() {
-=======
 LT_BuildActiveLines() {
->>>>>>> lines-and-tubes-images
     global LT_DeviceOrder, LT_InstanceOrder, LT_Instances, LT_DeviceDefs
 
     lines := []
@@ -1830,8 +1826,6 @@ LT_BuildActiveLines() {
     return lines
 }
 
-<<<<<<< HEAD
-=======
 ; "" if nothing is marked removed, otherwise the one grouped "X, Y are now
 ; absent" sentence.
 LT_BuildRemovalLine() {
@@ -1860,7 +1854,6 @@ LT_BuildLines() {
     removalLine := LT_BuildRemovalLine()
     if (removalLine != "")
         lines.Push(removalLine)
->>>>>>> lines-and-tubes-images
     return lines
 }
 
@@ -2149,8 +2142,6 @@ LT_RtfEscape(s) {
 ; word -- a semantic instruction telling the reader to draw its own bullet
 ; glyph, not a literal typed character -- with a hanging indent so wrapped
 ; continuation lines still align under the text rather than the bullet.
-<<<<<<< HEAD
-=======
 ; A single line doesn't need list machinery -- no leading blank paragraph
 ; (that's only there to let PowerScribe's own list continue from it), no
 ; \pn bullet definition, just the plain text.
@@ -2172,24 +2163,17 @@ LT_BuildPlainRTF(lines) {
     return rtf
 }
 
->>>>>>> lines-and-tubes-images
 LT_BuildBulletRTF(lines) {
     ; Matched directly against real RTF captured from PowerScribe's own
     ; editor (Riched20), not the Word-style {\listtable}/{\listoverridetable}
     ; mechanism used earlier -- RichEdit uses the older, simpler \pn
     ; destination group instead. It's defined once, on the first bullet
-<<<<<<< HEAD
-    ; paragraph; every later bullet just repeats the {\pntext...} fallback
-    ; marker and inherits that paragraph's hanging indent, no \pard needed
-    ; per line.
-=======
     ; paragraph; every later bullet -- including the last one -- just
     ; repeats the {\pntext...} fallback marker and gets its own trailing
     ; \par, exactly like PowerScribe's own captured reference does. (An
     ; earlier version dropped every line's own \par to fix a trailing
     ; blank-line bug; that bug was actually the separate \pard\par reset
     ; that used to follow the loop, not the per-line \par itself.)
->>>>>>> lines-and-tubes-images
     header := "
     (LTrim
     {\rtf1\ansi\ansicpg1252\deff0\deflang1033
@@ -2201,19 +2185,10 @@ LT_BuildBulletRTF(lines) {
 
     rtf := header
     for i, line in lines {
-<<<<<<< HEAD
-        if (i > 1)
-            rtf .= "\par"
-        if (i = 1)
-            rtf .= "\pard{\pntext\f1\'B7\tab}{\*\pn\pnlvlblt\pnf1\pnindent0{\pntxtb\'B7}}\fi-360\li360 " LT_RtfEscape(line)
-        else
-            rtf .= "{\pntext\f1\'B7\tab}" LT_RtfEscape(line)
-=======
         if (i = 1)
             rtf .= "\pard{\pntext\f1\'B7\tab}{\*\pn\pnlvlblt\pnf1\pnindent0{\pntxtb\'B7}}\fi-360\li360 " LT_RtfEscape(line) "\par"
         else
             rtf .= "{\pntext\f1\'B7\tab}" LT_RtfEscape(line) "\par"
->>>>>>> lines-and-tubes-images
     }
     rtf .= "}"
     return rtf
@@ -2227,43 +2202,6 @@ LT_BuildBulletRTF(lines) {
 LT_SetClipboardTextAndRTF(plain, rtf) {
     if !DllCall("OpenClipboard", "ptr", 0, "int") {
         MsgBox "Could not open clipboard."
-<<<<<<< HEAD
-        return
-    }
-
-    DllCall("EmptyClipboard")
-
-    lenW := (StrLen(plain) + 1) * 2
-    hText := DllCall("GlobalAlloc", "uint", 0x2, "uptr", lenW, "ptr")
-    if (hText) {
-        pText := DllCall("GlobalLock", "ptr", hText, "ptr")
-        StrPut(plain, pText, "UTF-16")
-        DllCall("GlobalUnlock", "ptr", hText)
-        DllCall("SetClipboardData", "uint", 13, "ptr", hText)  ; CF_UNICODETEXT
-    }
-
-    cfRtf := DllCall("RegisterClipboardFormat", "str", "Rich Text Format", "uint")
-    lenA := StrLen(rtf) + 1
-    hRtf := DllCall("GlobalAlloc", "uint", 0x2, "uptr", lenA, "ptr")
-    if (hRtf) {
-        pRtf := DllCall("GlobalLock", "ptr", hRtf, "ptr")
-        StrPut(rtf, pRtf, "CP0")
-        DllCall("GlobalUnlock", "ptr", hRtf)
-        DllCall("SetClipboardData", "uint", cfRtf, "ptr", hRtf)
-    }
-
-    DllCall("CloseClipboard")
-}
-
-LT_CopyOutput(*) {
-    if (LT_AnyInstanceNeedsSideWarning()) {
-        MsgBox("Please select a side for all red devices.", "Missing side", 48)
-        return
-    }
-    lines := LT_BuildLines()
-    plain := LT_JoinLinesPlain(lines)
-    rtf := LT_BuildBulletRTF(lines)
-=======
         return
     }
 
@@ -2312,7 +2250,6 @@ LT_CopyOutput(*) {
         plain := LT_JoinLinesPlain(lines)
         rtf := LT_BuildBulletRTF(lines)
     }
->>>>>>> lines-and-tubes-images
     LT_SetClipboardTextAndRTF(plain, rtf)
     ToolTip("Copied to clipboard")
     SetTimer(() => ToolTip(), -1000)
