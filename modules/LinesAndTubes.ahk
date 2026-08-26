@@ -792,7 +792,6 @@ LT_BuildDeviceDefs() {
                 "options", ["Right", "Left"]),
             Map("id", "boreSize", "type", "buttons", "label", "Bore",
                 "options", ["", "Large bore", "Small bore"]),
-            Map("id", "modNew", "type", "toggle", "label", "New"),
             Map("id", "modRepositioned", "type", "toggle", "label", "Repositioned"),
             Map("id", "modTunneled", "type", "toggle", "label", "Tunneled"),
             Map("id", "modSheathed", "type", "toggle", "label", "Sheathed"),
@@ -813,7 +812,6 @@ LT_BuildDeviceDefs() {
                 "options", ["Right", "Left"]),
             Map("id", "boreSize", "type", "buttons", "label", "Bore",
                 "options", ["", "Large bore", "Small bore"]),
-            Map("id", "modNew", "type", "toggle", "label", "New"),
             Map("id", "modRepositioned", "type", "toggle", "label", "Repositioned"),
             Map("id", "modTunneled", "type", "toggle", "label", "Tunneled"),
             Map("id", "modSheathed", "type", "toggle", "label", "Sheathed"),
@@ -1289,8 +1287,6 @@ LT_Sentence_CentralLine(fields, nounBase) {
     ; large bore AND sheathed at once); bore size stays mutually exclusive
     ; with itself since a catheter can't be both large and small bore.
     attrParts := []
-    if (fields.Get("modNew", false))
-        attrParts.Push("new")
     if (fields.Get("modRepositioned", false))
         attrParts.Push("repositioned")
     if (fields.Get("modTunneled", false))
@@ -1430,6 +1426,7 @@ LT_AggregatePleural(instancesFields) {
     for i, f in instancesFields {
         s := LT_Sentence_Pleural(f)
         s := LT_AppendOtherNote(s, f)
+        s := LT_PrependNewModifier(s, f)
         s := LT_StripTrailingPeriod(s)
         if (i > 1)
             s := LT_LowercaseFirst(s)
@@ -1566,6 +1563,7 @@ LT_AggregateMediastinal(instancesFields) {
     order := []
     anyInferior := false
     anyOtherNote := false
+    anyIsNew := false
 
     for f in instancesFields {
         pos := f.Get("position", "")
@@ -1579,6 +1577,8 @@ LT_AggregateMediastinal(instancesFields) {
             anyInferior := true
         if (f.Get("otherNote", false))
             anyOtherNote := true
+        if (f.Get("isNew", false))
+            anyIsNew := true
     }
 
     canonical := ["Anterior", "Posterior", ""]
@@ -1615,8 +1615,9 @@ LT_AggregateMediastinal(instancesFields) {
 
     modifier := anyInferior ? "inferior approach " : ""
     noun := (totalCount > 1) ? "mediastinal drains" : "mediastinal drain"
+    newPrefix := anyIsNew ? "New " : ""
 
-    line := LT_Capitalize(modifier noun)
+    line := LT_Capitalize(newPrefix modifier noun)
     if (groupTexts.Length > 0)
         line .= ": " LT_JoinWithAnd(groupTexts)
     if (anyOtherNote)
@@ -1780,6 +1781,16 @@ LT_AppendOtherNote(s, fields) {
     return s " _____"
 }
 
+; Every device instance also has a universal "New" toggle, same idea as
+; Now-absent/Add-info -- applies to any device, not just IJ/SCV (which
+; used to have their own dedicated New checkbox; removed in favor of this,
+; see LT_Sentence_CentralLine).
+LT_PrependNewModifier(s, fields) {
+    if (!fields.Get("isNew", false) || s = "")
+        return s
+    return "New " LT_LowercaseFirst(s)
+}
+
 ; No terminal periods on any output line -- strip one if a sentence
 ; function (or the removal-grouping sentence) happens to end with one.
 LT_StripTrailingPeriod(s) {
@@ -1813,6 +1824,7 @@ LT_BuildActiveLines() {
                 s := sentenceFn(fields)
                 if (s != "") {
                     s := LT_AppendOtherNote(s, fields)
+                    s := LT_PrependNewModifier(s, fields)
                     s := LT_StripTrailingPeriod(s)
                     lines.Push(s)
                 }
@@ -2361,6 +2373,7 @@ LT_RenderOutputPane() {
             if (s = "")
                 continue
             s := LT_AppendOtherNote(s, fields)
+            s := LT_PrependNewModifier(s, fields)
             s := LT_StripTrailingPeriod(s)
 
             approxRows := Ceil(StrLen(s) / 50)
@@ -2841,6 +2854,11 @@ LT_RenderInstancePanel(g, x, y, w, instId) {
     cb := LT_AddMid(g, "CheckBox", "x" innerX " y" curY " w200", "Now absent")
     cb.Value := isRemoved ? 1 : 0
     cb.OnEvent("Click", LT_FieldToggle.Bind(instId, "removed"))
+    curY += 26
+
+    newCb := LT_AddMid(g, "CheckBox", "x" innerX " y" curY " w200", "New")
+    newCb.Value := fields.Get("isNew", false) ? 1 : 0
+    newCb.OnEvent("Click", LT_FieldToggle.Bind(instId, "isNew"))
     curY += 26
 
     otherCb := LT_AddMid(g, "CheckBox", "x" innerX " y" curY " w200", "Add info")
