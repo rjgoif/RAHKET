@@ -27,7 +27,8 @@ if (A_LineFile = A_ScriptFullPath) {
         . "Ctrl + J         = Join lines (merge paragraphs, add periods)`n"
         . "Ctrl + Shift + J = Split into single-sentence lines`n"
         . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD`n"
-        . "Ctrl + Shift + S = Sort measurements in selection (descending)",
+        . "Ctrl + Shift + S = Sort measurements in selection (descending)`n"
+        . "Ctrl + Shift + U = Convert units (cm to mm, or mm to cm)",
         "PowerScribe Text Formatter", 64))
     A_TrayMenu.Add()
     A_TrayMenu.Add("Exit", (*) => ExitApp())
@@ -39,7 +40,8 @@ if (A_LineFile = A_ScriptFullPath) {
         . "Ctrl + J         = Join lines (merge paragraphs, add periods)`n"
         . "Ctrl + Shift + J = Split into single-sentence lines`n"
         . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD`n"
-        . "Ctrl + Shift + S = Sort measurements in selection (descending)",
+        . "Ctrl + Shift + S = Sort measurements in selection (descending)`n"
+        . "Ctrl + Shift + U = Convert units (cm to mm, or mm to cm)",
         "Text Formatter", 64)
 }
 
@@ -124,6 +126,34 @@ if (A_LineFile = A_ScriptFullPath) {
     ; only if clipboard still matches our text
     SetTimer(RestoreClipboard_PSF.Bind(ClipSaved, modifiedText), -1000)
 
+}
+
+; Ctrl+Shift+U: Convert units. cm -> mm if any cm present, otherwise mm -> cm
+^+u up::
+{
+    ClipSaved := ClipboardAll()
+
+    A_Clipboard := ""
+    Send("{Shift up}")
+    Send("^c")
+
+    if !ClipWait(1) {
+        A_Clipboard := ClipSaved
+        return
+    }
+
+    selectedText := A_Clipboard
+    modifiedText := ConvertUnitsInText(selectedText)
+
+    if (modifiedText = selectedText) {
+        A_Clipboard := ClipSaved
+        return
+    }
+
+    A_Clipboard := modifiedText
+    Send("^v")
+
+    SetTimer(RestoreClipboard_PSF.Bind(ClipSaved, modifiedText), -1000)
 }
 
 ; Ctrl+Shift+S: Sort dimensions in the selection in descending order
@@ -249,6 +279,13 @@ if (A_LineFile = A_ScriptFullPath) {
     if LineJoiner_PromptAndEnable()
         Send("^+s")
 }
+
+^+u up::
+{
+    if LineJoiner_PromptAndEnable()
+        Send("^+u")
+}
+
 #HotIf
 
 
@@ -267,7 +304,8 @@ LineJoiner_Enable() {
         . "Ctrl + J         = Join lines (merge paragraphs, add periods)`n"
         . "Ctrl + Shift + J = Split into single-sentence lines`n"
         . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD`n"
-        . "Ctrl + Shift + S = Sort measurements in selection (descending)",
+        . "Ctrl + Shift + S = Sort measurements in selection (descending)`n"
+        . "Ctrl + Shift + U = Convert units (cm to mm, or mm to cm)",
         "Report Editor", 64)
 }
 
@@ -510,6 +548,104 @@ WaitForClipboard(expectedText, timeoutMs := 1000) {
         Sleep(10)
     }
     return false
+}
+
+; ---- Unit conversion helpers ----
+
+; If any cm is present, convert cm -> mm (mm values untouched).
+; Otherwise, if mm is present, convert mm -> cm.
+ConvertUnitsInText(text) {
+    hasCm := RegExMatch(text, "i)\d\s*cm(?![A-Za-z])")
+    hasMm := RegExMatch(text, "i)\d\s*mm(?![A-Za-z])")
+
+    if (!hasCm && !hasMm)
+        return text
+
+    toMm := hasCm
+
+    numPat  := "\d+(?:\.\d+)?"
+    unitPat := "(?:\s*(?:mm|cm)(?![A-Za-z]))?"
+    pattern := "i)\b" . numPat . unitPat
+        . "(?:\s*[x\x{D7}]\s*" . numPat . unitPat . ")*"
+
+    result   := ""
+    startPos := 1
+
+    while (foundPos := RegExMatch(text, pattern, &m, startPos)) {
+        result .= SubStr(text, startPos, foundPos - startPos)
+        result .= ConvertUnitGroup(m[0], toMm)
+        startPos := foundPos + m.Len(0)
+    }
+
+    result .= SubStr(text, startPos)
+    return result
+}
+
+; Convert one number group. Numbers without their own unit take the next
+; unit found later in the group (e.g. "3.2 x 1.1 cm" -> both are cm).
+ConvertUnitGroup(grp, toMm) {
+    tokenPat := "i)(\d+(?:\.\d+)?)(\s*(mm|cm)(?![A-Za-z]))?"
+    srcUnit  := toMm ? "cm" : "mm"
+    dstUnit  := toMm ? "mm" : "cm"
+
+    ; Pass 1: collect numbers and their explicit units
+    nums  := []
+    units := []
+    pos   := 1
+    while (p := RegExMatch(grp, tokenPat, &n, pos)) {
+        nums.Push(n[1])
+        units.Push(n[3] != "" ? StrLower(n[3]) : "")
+        pos := p + n.Len(0)
+    }
+
+    ; Back-fill effective units from the right
+    eff      := []
+    nextUnit := ""
+    loop nums.Length {
+        i := nums.Length - A_Index + 1
+        if (units[i] != "")
+            nextUnit := units[i]
+        eff.InsertAt(1, nextUnit)
+    }
+
+    ; Pass 2: rebuild
+    out := ""
+    pos := 1
+    idx := 0
+    while (p := RegExMatch(grp, tokenPat, &n, pos)) {
+        idx++
+        out .= SubStr(grp, pos, p - pos)
+
+        if (eff[idx] = srcUnit) {
+            out .= ConvertNumber(n[1], toMm)
+            if (n[2] != "")
+                out .= RegExReplace(n[2], "i)(mm|cm)", dstUnit)
+        } else {
+            out .= n[0]
+        }
+
+        pos := p + n.Len(0)
+    }
+    out .= SubStr(grp, pos)
+    return out
+}
+
+; cm -> mm: whole numbers shown without decimals (3.2 -> 32)
+; mm -> cm: always at least one decimal (10 -> 1.0)
+ConvertNumber(numStr, toMm) {
+    v := Number(numStr)
+    s := Round(toMm ? v * 10 : v / 10, 3)
+    s := String(s)
+
+    if InStr(s, ".") {
+        s := RegExReplace(s, "(\.\d*?)0+$", "$1")
+        s := RegExReplace(s, "\.$", "")
+    }
+
+    if (!toMm && !InStr(s, "."))
+        s .= ".0"
+
+    return s
 }
 
 RestoreClipboard_PSF(savedClip, expectedText) {
