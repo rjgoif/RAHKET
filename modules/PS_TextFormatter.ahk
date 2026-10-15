@@ -26,7 +26,8 @@ if (A_LineFile = A_ScriptFullPath) {
         "Text Formatter is active`n`n"
         . "Ctrl + J         = Join lines (merge paragraphs, add periods)`n"
         . "Ctrl + Shift + J = Split into single-sentence lines`n"
-        . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD",
+        . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD`n"
+        . "Ctrl + Shift + S = Sort measurements in selection (descending)",
         "PowerScribe Text Formatter", 64))
     A_TrayMenu.Add()
     A_TrayMenu.Add("Exit", (*) => ExitApp())
@@ -37,7 +38,8 @@ if (A_LineFile = A_ScriptFullPath) {
         . "Highlight text in PowerScribe:`n`n"
         . "Ctrl + J         = Join lines (merge paragraphs, add periods)`n"
         . "Ctrl + Shift + J = Split into single-sentence lines`n"
-        . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD",
+        . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD`n"
+        . "Ctrl + Shift + S = Sort measurements in selection (descending)",
         "Text Formatter", 64)
 }
 
@@ -122,6 +124,30 @@ if (A_LineFile = A_ScriptFullPath) {
     ; only if clipboard still matches our text
     SetTimer(RestoreClipboard_PSF.Bind(ClipSaved, modifiedText), -1000)
 
+}
+
+; Ctrl+Shift+S: Sort dimensions in the selection in descending order
+; e.g. "3.3 x 6.9 x 8.2 cm" -> "8.2 x 6.9 x 3.3 cm"
+^+s up::
+{
+    ClipSaved := ClipboardAll()
+
+    A_Clipboard := ""
+    Send("{Shift up}")
+    Send("^c")
+
+    if !ClipWait(1) {
+        A_Clipboard := ClipSaved
+        return
+    }
+
+    selectedText := A_Clipboard
+    modifiedText := SortMeasurementsInText(selectedText)
+
+    A_Clipboard := modifiedText
+    Send("^v")
+
+    SetTimer(RestoreClipboard_PSF.Bind(ClipSaved, modifiedText), -1000)
 }
 
 ; Ctrl+Shift+J: Break lines at periods (opposite of Ctrl+J)
@@ -217,6 +243,12 @@ if (A_LineFile = A_ScriptFullPath) {
     if LineJoiner_PromptAndEnable()
         Send("^+d")
 }
+
+^+s up::
+{
+    if LineJoiner_PromptAndEnable()
+        Send("^+s")
+}
 #HotIf
 
 
@@ -234,7 +266,8 @@ LineJoiner_Enable() {
         . "Highlight text in PowerScribe:`n`n"
         . "Ctrl + J         = Join lines (merge paragraphs, add periods)`n"
         . "Ctrl + Shift + J = Split into single-sentence lines`n"
-        . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD",
+        . "Ctrl + Shift + D = Convert dates in selection to YYYY-MMM-DD`n"
+        . "Ctrl + Shift + S = Sort measurements in selection (descending)",
         "Report Editor", 64)
 }
 
@@ -402,6 +435,71 @@ NormalizeYear(y) {
             y += 1900
     }
     return y
+}
+
+; ---- Measurement sorting helpers ----
+
+; Find dimension groups (2+ numbers joined by "x") and sort the numbers descending
+SortMeasurementsInText(text) {
+    numPat  := "\d+(?:\.\d+)?"
+    unitPat := "(?:\s*(?:mm|cm))?"
+    pattern := "i)\b" . numPat . unitPat
+        . "(?:\s*[x\x{D7}]\s*" . numPat . unitPat . ")+"
+
+    result   := ""
+    startPos := 1
+
+    while (foundPos := RegExMatch(text, pattern, &m, startPos)) {
+        result .= SubStr(text, startPos, foundPos - startPos)
+        result .= SortMeasurementGroup(m[0])
+        startPos := foundPos + m.Len(0)
+    }
+
+    result .= SubStr(text, startPos)
+    return result
+}
+
+; Sort the numbers inside one matched group, leaving separators and units in place.
+; If the group mixes units (e.g. "3 mm x 1.2 cm"), it is returned unchanged.
+SortMeasurementGroup(grp) {
+    nums  := []
+    units := Map()
+    pos   := 1
+
+    while (p := RegExMatch(grp, "i)(\d+(?:\.\d+)?)(?:\s*(mm|cm))?", &n, pos)) {
+        nums.Push(n[1])
+        if (n[2] != "")
+            units[StrLower(n[2])] := true
+        pos := p + n.Len(0)
+    }
+
+    if (units.Count > 1)
+        return grp
+
+    ; Insertion sort, descending (keeps original number text, e.g. "3.0")
+    sorted := nums.Clone()
+    loop sorted.Length - 1 {
+        i := A_Index + 1
+        v := sorted[i]
+        j := i - 1
+        while (j >= 1 && Number(sorted[j]) < Number(v)) {
+            sorted[j + 1] := sorted[j]
+            j--
+        }
+        sorted[j + 1] := v
+    }
+
+    ; Rebuild: replace each number in order, keep everything else
+    out := ""
+    pos := 1
+    idx := 0
+    while (p := RegExMatch(grp, "\d+(?:\.\d+)?", &n, pos)) {
+        idx++
+        out .= SubStr(grp, pos, p - pos) . sorted[idx]
+        pos := p + n.Len(0)
+    }
+    out .= SubStr(grp, pos)
+    return out
 }
 
 WaitForClipboard(expectedText, timeoutMs := 1000) {
