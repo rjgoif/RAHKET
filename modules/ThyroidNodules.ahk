@@ -1909,7 +1909,7 @@ TN_UpdateDisplay() {
             else
                 finalText .= "`n" outRight "`n"
         }
-        finalText .= "`nRight nodes`n`n"
+        finalText .= (rightDefault ? "" : "`n") "Right nodes`n`n"
 
         ; Left lobe block
         finalText .= "Left thyroid:`n"
@@ -1921,7 +1921,7 @@ TN_UpdateDisplay() {
             else
                 finalText .= "`n" outLeft "`n"
         }
-        finalText .= "`nLeft nodes`n"
+        finalText .= (leftDefault ? "" : "`n") "Left nodes`n"
 
         finalText .= "Parathyroid: none/parathyroid`n"
     }
@@ -2579,7 +2579,7 @@ TN_FormatNoduleBlock(text, trailingBlank := true) {
     if (text = "")
         return ""
     if (text = defaultText)
-        return text "`n"           ; no extra blank lines for default text
+        return text           ; no extra blank lines for default text
     return "`n" text (trailingBlank ? "`n" : "")   ; blank line before (& after, if trailingBlank) real nodules
 }
 
